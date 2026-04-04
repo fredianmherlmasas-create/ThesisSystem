@@ -242,13 +242,102 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
 
     // === Dynamic Form Config ===
-    let formConfig = JSON.parse(localStorage.getItem('bisuFormConfig')) || {
+    const getDefaultFormConfig = () => ({
         offices: ["Registrar's Office", "Cashier", "Library", "Clinic", "Guidance Office"],
-        dimensions: defaultDimensions
+        dimensions: JSON.parse(JSON.stringify(defaultDimensions))
+    });
+
+    const normalizeFormConfig = (config) => {
+        const normalized = config || {};
+        if (!Array.isArray(normalized.offices) || normalized.offices.length === 0) {
+            normalized.offices = getDefaultFormConfig().offices;
+        }
+
+        if (!normalized.dimensions || typeof normalized.dimensions !== 'object') {
+            normalized.dimensions = JSON.parse(JSON.stringify(defaultDimensions));
+        }
+
+        ['en', 'tl', 'ceb'].forEach(lang => {
+            if (!Array.isArray(normalized.dimensions[lang]) || normalized.dimensions[lang].length === 0) {
+                normalized.dimensions[lang] = JSON.parse(JSON.stringify(defaultDimensions[lang]));
+            }
+        });
+
+        return normalized;
     };
-    
-    // Ensure backwards compatibility if old cache doesn't have dimensions
-    if(!formConfig.dimensions) formConfig.dimensions = defaultDimensions;
+
+    let formConfig = normalizeFormConfig(JSON.parse(localStorage.getItem('bisuFormConfig')) || getDefaultFormConfig());
+
+    async function getSupabaseClient() {
+        if (window.supabaseClient) return window.supabaseClient;
+        if (window.supabaseReady) {
+            try {
+                return await window.supabaseReady;
+            } catch (_) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    const EVALUATION_TABLE = 'evaluations';
+    const LEGACY_FEEDBACK_TABLE = 'feedbacks';
+
+    function isMissingTableError(error) {
+        if (!error) return false;
+        const msg = (error.message || '').toLowerCase();
+        return error.code === '42P01' || msg.includes('relation') && msg.includes('does not exist');
+    }
+
+    async function insertEvaluations(client, rows) {
+        const attempt = await client.from(EVALUATION_TABLE).insert(rows);
+        if (!attempt.error) {
+            // Keep legacy dashboard/data sources aligned while transitioning tables.
+            const legacyAttempt = await client.from(LEGACY_FEEDBACK_TABLE).insert(rows);
+            if (legacyAttempt.error && !isMissingTableError(legacyAttempt.error)) {
+                console.warn('Legacy feedback mirror insert failed:', legacyAttempt.error);
+            }
+            return attempt;
+        }
+
+        if (isMissingTableError(attempt.error)) {
+            return await client.from(LEGACY_FEEDBACK_TABLE).insert(rows);
+        }
+
+        return attempt;
+    }
+
+    async function selectEvaluations(client) {
+        const attempt = await client.from(EVALUATION_TABLE).select('*').order('created_at', { ascending: false });
+        if (!attempt.error) return attempt;
+
+        if (isMissingTableError(attempt.error)) {
+            return await client.from(LEGACY_FEEDBACK_TABLE).select('*').order('created_at', { ascending: false });
+        }
+
+        return attempt;
+    }
+
+    async function loadFormConfigFromDatabase() {
+        const client = await getSupabaseClient();
+        if (!client) return;
+
+        const { data, error } = await client
+            .from('admin_settings')
+            .select('config')
+            .eq('id', 'global_config')
+            .maybeSingle();
+
+        if (error) {
+            console.error('Failed to load admin settings from Supabase:', error);
+            return;
+        }
+
+        if (data && data.config) {
+            formConfig = normalizeFormConfig(data.config);
+            localStorage.setItem('bisuFormConfig', JSON.stringify(formConfig));
+        }
+    }
 
     function renderDynamicFields() {
         const officeSelect = document.getElementById('office-visited');
@@ -382,8 +471,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    renderDynamicFields();
-    renderLikertScales();
+    async function initializeFormConfig() {
+        await loadFormConfigFromDatabase();
+        renderDynamicFields();
+        renderLikertScales();
+    }
+
+    initializeFormConfig();
 
     function applyTranslations(lang) {
         currentLang = lang;
@@ -426,34 +520,120 @@ document.addEventListener('DOMContentLoaded', () => {
         window.scrollTo(0,0);
     });
 
-    adminLoginBtn.addEventListener('click', () => {
-        // Simple client-side pseudo-auth for demonstration
-        const pwd = prompt("Enter Admin Password (demo: admin123):");
-        if(pwd === "admin123") {
-            viewFeedback.classList.add('section-hidden');
-            viewComplaint.classList.add('section-hidden');
-            privacyModal.style.display = 'none';
-            viewAdmin.classList.remove('section-hidden');
-            fetchAdminData();
-        } else if(pwd !== null) {
-            showToast('Invalid password', 'error');
-        }
-    });
+    function openAdminView() {
+        viewFeedback.classList.add('section-hidden');
+        viewComplaint.classList.add('section-hidden');
+        privacyModal.style.display = 'none';
+        viewAdmin.classList.remove('section-hidden');
+    }
 
-    logoutAdminBtn.addEventListener('click', () => {
+    function closeAdminView() {
         viewAdmin.classList.add('section-hidden');
         viewFeedback.classList.remove('section-hidden');
+    }
+
+    async function isCurrentUserAdmin(client) {
+        const { data: authData, error: authError } = await client.auth.getUser();
+        if (authError || !authData?.user) return false;
+
+        const { data: adminData, error: adminError } = await client
+            .from('admin_users')
+            .select('user_id')
+            .eq('user_id', authData.user.id)
+            .maybeSingle();
+
+        if (adminError) {
+            console.error('Admin verification failed:', adminError);
+            return false;
+        }
+
+        return !!adminData;
+    }
+
+    adminLoginBtn.addEventListener('click', async () => {
+        const client = await getSupabaseClient();
+        if (!client) {
+            showToast('Supabase is not connected. Please check your project keys.', 'error');
+            return;
+        }
+
+        const email = prompt('Enter admin email:');
+        if (email === null || email.trim() === '') return;
+
+        const password = prompt('Enter admin password:');
+        if (password === null || password === '') return;
+
+        const { error: signInError } = await client.auth.signInWithPassword({
+            email: email.trim(),
+            password
+        });
+
+        if (signInError) {
+            showToast('Login failed. Check your email/password.', 'error');
+            return;
+        }
+
+        const adminAllowed = await isCurrentUserAdmin(client);
+        if (!adminAllowed) {
+            await client.auth.signOut();
+            showToast('Account is not registered as admin.', 'error');
+            return;
+        }
+
+        openAdminView();
+        fetchAdminData();
+    });
+
+    logoutAdminBtn.addEventListener('click', async () => {
+        const client = await getSupabaseClient();
+        if (client) {
+            await client.auth.signOut();
+        }
+        closeAdminView();
     });
 
     document.getElementById('refresh-data-btn').addEventListener('click', fetchAdminData);
+
+    (async () => {
+        const client = await getSupabaseClient();
+        if (!client) return;
+
+        const isAdmin = await isCurrentUserAdmin(client);
+        if (isAdmin) {
+            openAdminView();
+            fetchAdminData();
+        }
+
+        client.auth.onAuthStateChange(async (_event, session) => {
+            if (!session) {
+                closeAdminView();
+                return;
+            }
+
+            const allowed = await isCurrentUserAdmin(client);
+            if (allowed) {
+                openAdminView();
+                fetchAdminData();
+            } else {
+                closeAdminView();
+            }
+        });
+    })();
 
     // === Form Submissions & Supabase ===
 
     feedbackForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+
+        const clientType = (document.getElementById('client-type').value || '').trim();
+        const allowedClientTypes = ['Student', 'Faculty', 'Citizen', 'Business', 'Government'];
+        if (!allowedClientTypes.includes(clientType)) {
+            showToast('Please select a valid client type.', 'error');
+            return;
+        }
         
         // Validate Likert Ratings dynamically active
-        const activeDims = formConfig.dimensions['en'];
+        const activeDims = formConfig.dimensions[currentLang] || formConfig.dimensions['en'];
         for (let d of activeDims) {
             if (currentRatings[d.id] === null || currentRatings[d.id] === undefined) {
                 showToast(`Please rate: ${d.label}`, 'error');
@@ -481,7 +661,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const payload = {
             office_visited: document.getElementById('office-visited').value,
             service_availed: document.getElementById('service-availed').value,
-            client_type: document.getElementById('client-type').value,
+            client_type: clientType,
             sex: document.getElementById('client-sex').value || null,
             cc1: parseInt(cc1Value || 0),
             cc2: parseInt(cc2Value || 0),
@@ -493,8 +673,9 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         try {
-            if (navigator.onLine && window.supabaseClient) {
-                const { error } = await window.supabaseClient.from('feedbacks').insert([payload]);
+            const client = await getSupabaseClient();
+            if (navigator.onLine && client) {
+                const { error } = await insertEvaluations(client, [payload]);
                 if (error) throw error;
                 showToast('Feedback submitted successfully!', 'success');
                 resetFeedbackForm();
@@ -504,8 +685,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 resetFeedbackForm();
             }
         } catch (error) {
-            console.error(error);
-            showToast('Failed to submit. Saved offline.', 'error');
+            console.error('Feedback insert failed:', error);
+            showToast(`Failed to submit (${error.message || 'unknown error'}). Saved offline.`, 'error');
             saveOffline('pendingFeedbacks', payload);
             resetFeedbackForm();
         } finally {
@@ -555,8 +736,9 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         try {
-            if (navigator.onLine && window.supabaseClient) {
-                const { error } = await window.supabaseClient.from('complaints').insert([payload]);
+            const client = await getSupabaseClient();
+            if (navigator.onLine && client) {
+                const { error } = await client.from('complaints').insert([payload]);
                 if (error) throw error;
                 showToast('Complaint submitted successfully.', 'success');
                 complaintForm.reset();
@@ -568,8 +750,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 backToFeedbackBtn.click();
             }
         } catch (error) {
-            console.error(error);
-            showToast('Error submitting. Saved offline.', 'error');
+            console.error('Complaint insert failed:', error);
+            showToast(`Error submitting (${error.message || 'unknown error'}). Saved offline.`, 'error');
             saveOffline('pendingComplaints', payload);
             complaintForm.reset();
             backToFeedbackBtn.click();
@@ -616,27 +798,32 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem(key, JSON.stringify(items));
     }
 
-    function syncOfflineData() {
-        if (!navigator.onLine || !window.supabaseClient) return;
+    async function syncOfflineData() {
+        const client = await getSupabaseClient();
+        if (!navigator.onLine || !client) return;
 
         const pFeedbacks = JSON.parse(localStorage.getItem('pendingFeedbacks')) || [];
         if (pFeedbacks.length > 0) {
-            window.supabaseClient.from('feedbacks').insert(pFeedbacks).then(({error}) => {
-                if (!error) {
-                    localStorage.removeItem('pendingFeedbacks');
-                    showToast('Offline feedbacks synced!', 'success');
-                }
-            });
+            const { error } = await insertEvaluations(client, pFeedbacks);
+            if (!error) {
+                localStorage.removeItem('pendingFeedbacks');
+                showToast('Offline feedbacks synced!', 'success');
+            } else {
+                console.error('Offline feedback sync failed:', error);
+                showToast(`Offline feedback sync failed: ${error.message}`, 'error');
+            }
         }
 
         const pComplaints = JSON.parse(localStorage.getItem('pendingComplaints')) || [];
         if (pComplaints.length > 0) {
-            window.supabaseClient.from('complaints').insert(pComplaints).then(({error}) => {
-                if (!error) {
-                    localStorage.removeItem('pendingComplaints');
-                    showToast('Offline complaints synced!', 'success');
-                }
-            });
+            const { error } = await client.from('complaints').insert(pComplaints);
+            if (!error) {
+                localStorage.removeItem('pendingComplaints');
+                showToast('Offline complaints synced!', 'success');
+            } else {
+                console.error('Offline complaint sync failed:', error);
+                showToast(`Offline complaint sync failed: ${error.message}`, 'error');
+            }
         }
     }
 
@@ -720,7 +907,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if(saveSettingsBtn) {
-        saveSettingsBtn.addEventListener('click', () => {
+        saveSettingsBtn.addEventListener('click', async () => {
             try {
                 const parsedOffices = configOffices.value.split('\n').map(o => o.trim()).filter(o => o !== '');
                 formConfig.offices = parsedOffices;
@@ -750,7 +937,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                 }
                 
+                formConfig = normalizeFormConfig(formConfig);
                 localStorage.setItem('bisuFormConfig', JSON.stringify(formConfig));
+
+                const client = await getSupabaseClient();
+                if (client) {
+                    const { error } = await client.from('admin_settings').upsert({
+                        id: 'global_config',
+                        config: formConfig,
+                        updated_at: new Date().toISOString()
+                    });
+                    if (error) throw error;
+                }
                 
                 showToast('Form Settings Updated Successfully!', 'success');
                 adminSettingsModal.classList.add('hidden');
@@ -767,12 +965,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function fetchAdminData() {
-        if(!window.supabaseClient) return;
-        
+        const client = await getSupabaseClient();
+        if(!client) {
+            showToast('Supabase is not connected. Please check your project keys.', 'error');
+            return;
+        }
+
         // Fetch Feedbacks
-        const { data: fData, error: fErr } = await window.supabaseClient.from('feedbacks').select('*').order('created_at', { ascending: false });
+        const { data: fData, error: fErr } = await selectEvaluations(client);
         // Fetch Complaints
-        const { data: cData, error: cErr } = await window.supabaseClient.from('complaints').select('id');
+        const { data: cData, error: cErr } = await client.from('complaints').select('*').order('created_at', { ascending: false });
 
         if(fErr || cErr) {
             console.error("Fetch Error", fErr, cErr);
@@ -791,7 +993,23 @@ document.addEventListener('DOMContentLoaded', () => {
         renderCCTable(fData);
         renderReportTable(fData);
         renderCommendationsTable(fData);
-        renderLogTable(fData.slice(0, 5)); // Last 5 submissions
+
+        const combinedLogs = [
+            ...fData.map(row => ({ ...row, type: 'feedback' })),
+            ...cData.map(row => ({
+                id: row.id,
+                created_at: row.created_at,
+                office_visited: row.place_of_incident || 'N/A',
+                client_type: 'Complainant',
+                type: 'complaint',
+                mean_score: null,
+                service_availed: 'N/A',
+                commendations: null,
+                suggestions: row.details_of_complaint,
+                complaint_payload: row
+            }))
+        ];
+        renderLogTable(combinedLogs);
     }
 
     function renderCCTable(data) {
@@ -802,7 +1020,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const grouped = {};
         let totals = { cust: 0, m: 0, f: 0, cit: 0, bus: 0, gov: 0 };
-        // Array to store CC totals if they were implemented. Left 0 for now.
         let ccTotals = new Array(13).fill(0);
 
         data.forEach(row => {
@@ -818,6 +1035,22 @@ document.addEventListener('DOMContentLoaded', () => {
             if(row.client_type === 'Citizen') { g.cit++; totals.cit++; }
             if(row.client_type === 'Business') { g.bus++; totals.bus++; }
             if(row.client_type === 'Government') { g.gov++; totals.gov++; }
+
+            if(row.cc1 >= 1 && row.cc1 <= 4) {
+                const idx = row.cc1 - 1;
+                g.cc[idx]++;
+                ccTotals[idx]++;
+            }
+            if(row.cc2 >= 1 && row.cc2 <= 5) {
+                const idx = 4 + (row.cc2 - 1);
+                g.cc[idx]++;
+                ccTotals[idx]++;
+            }
+            if(row.cc3 >= 1 && row.cc3 <= 4) {
+                const idx = 9 + (row.cc3 - 1);
+                g.cc[idx]++;
+                ccTotals[idx]++;
+            }
         });
 
         for(let office in grouped) {
@@ -1058,11 +1291,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 const subject = encodeURIComponent(`BISU Feedback Alert - ${row.office_visited}`);
                 let bodyStr = `Attached is recent feedback submitted regarding the ${row.office_visited}.\n\n`;
                 bodyStr += `Date: ${new Date(row.created_at).toLocaleString()}\n`;
-                bodyStr += `Service: ${row.service_availed}\n`;
-                bodyStr += `Client: ${row.client_type}\n`;
-                bodyStr += `Average Score: ${row.mean_score || 'N/A'} out of 5.0\n\n`;
-                if(row.commendations) bodyStr += `Commendations: ${row.commendations}\n\n`;
-                if(row.suggestions) bodyStr += `Suggestions/Complaints: ${row.suggestions}\n\n`;
+                if(row.type === 'complaint' && row.complaint_payload) {
+                    const complaint = row.complaint_payload;
+                    bodyStr += `Complaint Name: ${complaint.name || 'Anonymous'}\n`;
+                    bodyStr += `Place of Incident: ${complaint.place_of_incident || 'N/A'}\n`;
+                    bodyStr += `Date of Incident: ${complaint.date_of_incident || 'N/A'}\n`;
+                    bodyStr += `Details: ${complaint.details_of_complaint || 'N/A'}\n`;
+                    bodyStr += `Narrative: ${complaint.narrative_report || 'N/A'}\n`;
+                    bodyStr += `Desired Outcome: ${complaint.desired_outcome || 'N/A'}\n\n`;
+                } else {
+                    bodyStr += `Service: ${row.service_availed}\n`;
+                    bodyStr += `Client: ${row.client_type}\n`;
+                    bodyStr += `Average Score: ${row.mean_score || 'N/A'} out of 5.0\n\n`;
+                    if(row.commendations) bodyStr += `Commendations: ${row.commendations}\n\n`;
+                    if(row.suggestions) bodyStr += `Suggestions/Complaints: ${row.suggestions}\n\n`;
+                }
                 bodyStr += `Please review and take any necessary actions.`;
                 
                 window.location.href = `mailto:?subject=${subject}&body=${encodeURIComponent(bodyStr)}`;
@@ -1072,7 +1315,32 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.action-print-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const row = JSON.parse(decodeURIComponent(e.currentTarget.getAttribute('data-json')));
-                const html = `
+                const html = row.type === 'complaint' && row.complaint_payload ? `
+                    <html><head><title>Print Complaint - BISU</title></head>
+                    <body style="font-family: Arial, sans-serif; padding: 40px; color: #1e293b; max-width: 800px; margin: 0 auto;">
+                        <div style="text-align: center; border-bottom: 2px solid #E84A1C; padding-bottom: 20px; margin-bottom: 30px;">
+                            <h2 style="color: #E84A1C; margin: 0;">Bohol Island State University - Calape</h2>
+                            <h3 style="color: #64748b; margin: 5px 0 0 0;">Official Complaint Record</h3>
+                        </div>
+                        <table style="width: 100%; margin-bottom: 30px; text-align: left; font-size: 14px;">
+                            <tr><th style="padding: 8px 0; width: 30%;">Date Filed:</th><td>${new Date(row.created_at).toLocaleString()}</td></tr>
+                            <tr><th style="padding: 8px 0;">Complainant:</th><td style="font-weight: bold;">${row.complaint_payload.name || 'Anonymous'}</td></tr>
+                            <tr><th style="padding: 8px 0;">Place of Incident:</th><td>${row.complaint_payload.place_of_incident || 'N/A'}</td></tr>
+                            <tr><th style="padding: 8px 0;">Desired Outcome:</th><td>${row.complaint_payload.desired_outcome || 'N/A'}</td></tr>
+                        </table>
+                        <div style="margin-bottom: 20px;">
+                            <h4 style="margin-bottom: 5px; color: #475569;">Details of Complaint:</h4>
+                            <p style="padding: 15px; border: 1px solid #e2e8f0; border-radius: 5px; white-space: pre-wrap;">${row.complaint_payload.details_of_complaint || 'None provided.'}</p>
+                        </div>
+                        <div>
+                            <h4 style="margin-bottom: 5px; color: #475569;">Narrative Report:</h4>
+                            <p style="padding: 15px; border: 1px solid #e2e8f0; border-radius: 5px; white-space: pre-wrap;">${row.complaint_payload.narrative_report || 'None provided.'}</p>
+                        </div>
+                        <div style="margin-top: 50px; text-align: center; font-size: 12px; color: #94a3b8;">
+                            Printed via BISU Admin System on ${new Date().toLocaleString()}
+                        </div>
+                    </body></html>
+                ` : `
                     <html><head><title>Print Feedback - BISU</title></head>
                     <body style="font-family: Arial, sans-serif; padding: 40px; color: #1e293b; max-width: 800px; margin: 0 auto;">
                         <div style="text-align: center; border-bottom: 2px solid #161275; padding-bottom: 20px; margin-bottom: 30px;">
@@ -1111,5 +1379,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Try syncing any pending on load
-    setTimeout(syncOfflineData, 2000);
+    setTimeout(() => {
+        syncOfflineData();
+    }, 2000);
 });
