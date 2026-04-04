@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BISU Calape - Feedback System</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'bisu-blue': '#161275', /* Deep Royal/Navy Blue from logo text ring */
+                        'bisu-gold': '#FBC006', /* Vibrant Gold from outer ring */
+                        'bisu-red': '#E84A1C',   /* Orange-Red from the torch flame */
+                        'bisu-green': '#0E811B'  /* Green from the island */
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="text-slate-800 antialiased min-h-screen flex flex-col relative overflow-x-hidden">
+
+    <!-- Header / Navbar -->
+    <header class="bg-bisu-blue text-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <!-- Logos -->
+                <div class="flex space-x-2 bg-white p-1 rounded-md items-center">
+                    <img src="images/BISU.png" alt="BISU Logo" class="w-10 h-10 object-contain hover:scale-105 transition-transform" title="BISU Logo">
+                    <img src="images/BAGONG-PILIPINAS-LOGO-1-1.png" alt="Bagong Pilipinas" class="w-10 h-10 object-contain hover:scale-105 transition-transform" title="Bagong Pilipinas">
+                    <img src="images/images.png" alt="TUV Rheinland" class="w-10 h-10 object-contain hover:scale-105 transition-transform rounded" title="TUV Rheinland">
+                </div>
+                <div>
+                    <h1 class="text-lg md:text-xl font-bold leading-tight">Bohol Island State University</h1>
+                    <p id="t-header-sub" class="text-xs md:text-sm text-blue-200">Calape Campus - Customer Satisfaction</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-4">
+                <select id="language-selector" class="bg-bisu-blue text-white text-xs md:text-sm px-2 py-1 rounded border border-blue-700 outline-none focus:ring-1 focus:ring-bisu-gold cursor-pointer transition-colors shadow-sm">
+                    <option value="en">English</option>
+                    <option value="tl">Tagalog</option>
+                    <option value="ceb">Bisaya</option>
+                </select>
+                <button id="admin-login-btn" class="text-white hover:text-bisu-gold transition-colors" title="Admin Access">
+                    <i class="fa-solid fa-lock"></i>
+                </button>
+            </div>
+        </div>
+        <div class="h-1 bg-gradient-to-r from-bisu-red via-bisu-gold to-bisu-red"></div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow max-w-4xl mx-auto w-full p-4 sm:p-6 lg:p-8">
+        
+        <!-- Privacy Consent Modal (Overlay) -->
+        <div id="privacy-modal" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900 bg-opacity-50 backdrop-blur-sm transition-opacity">
+            <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 m-4 animate-pop-in">
+                <div class="flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 text-bisu-blue mb-4 mx-auto">
+                    <i class="fa-solid fa-shield-halved text-2xl"></i>
+                </div>
+                <h2 id="t-modal-title" class="text-xl font-bold text-center mb-2">Data Privacy Act Consent</h2>
+                <p id="t-modal-desc" class="text-sm text-slate-600 mb-6 text-center">
+                    In accordance with the Data Privacy Act of 2012, we ensure that your personal data is protected. 
+                    The information gathered will be used solely for evaluating and improving our services.
+                </p>
+                <div class="flex items-start mb-6">
+                    <div class="flex items-center h-5">
+                        <input id="consent-checkbox" type="checkbox" class="w-5 h-5 text-bisu-blue bg-gray-100 border-gray-300 rounded focus:ring-bisu-blue">
+                    </div>
+                    <label for="consent-checkbox" id="t-modal-check" class="ml-3 text-sm font-medium text-slate-700">
+                        I agree to the terms and authorize BISU to process my feedback.
+                    </label>
+                </div>
+                <button id="accept-consent-btn" disabled class="w-full text-white bg-bisu-blue hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed font-medium rounded-xl text-lg px-5 py-3 text-center transition-all duration-200 shadow-md">
+                    <span id="t-modal-btn">Proceed to Form</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Notification Toast -->
+        <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2"></div>
+
+        <!-- VIEW: Feedback Form -->
+        <section id="view-feedback" class="space-y-6 section-hidden animate-slide-up">
+            <div class="glass p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex flex-col md:flex-row justify-between md:items-center mb-6 border-b pb-4">
+                    <h2 class="text-2xl font-bold text-bisu-blue"><i class="fa-solid fa-clipboard-list mr-2"></i> <span id="t-fb-title">Feedback Form</span></h2>
+                    <div class="text-sm text-slate-500 font-medium mt-2 md:mt-0 flex items-center">
+                        <i class="fa-regular fa-clock mr-1"></i> <span id="current-datetime"></span>
+                    </div>
+                </div>
+
+                <form id="feedback-form" class="space-y-6">
+                    <!-- Basic Info -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div>
+                            <label id="t-fb-office" class="block mb-2 text-sm font-semibold text-slate-700">Office Visited <span class="text-red-500">*</span></label>
+                            <select id="office-visited" required class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-xl focus:ring-bisu-blue focus:border-bisu-blue block w-full p-3 shadow-sm transition-all duration-200">
+                                <option value="" disabled selected id="t-sel-office">Select Office</option>
+                                <!-- Rendered dynamically via JS -->
+                            </select>
+                        </div>
+                        <div>
+                            <label id="t-fb-service" class="block mb-2 text-sm font-semibold text-slate-700">Service Availed <span class="text-red-500">*</span></label>
+                            <input type="text" id="service-availed" required placeholder="e.g., Enrollment, Grade Request" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-xl focus:ring-bisu-blue focus:border-bisu-blue block w-full p-3 shadow-sm transition-all duration-200">
+                        </div>
+                        <div>
+                            <label id="t-fb-type" class="block mb-2 text-sm font-semibold text-slate-700">Client Type <span class="text-red-500">*</span></label>
+                            <select id="client-type" required class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-xl focus:ring-bisu-blue focus:border-bisu-blue block w-full p-3 shadow-sm transition-all duration-200">
+                                <option value="" disabled selected id="t-sel-type">Select Type</option>
+                                <option value="Student" id="t-type-stu">Student</option>
+                                <option value="Faculty" id="t-type-fac">Faculty</option>
+                                <option value="Citizen" id="t-type-cit">Citizen</option>
+                                <option value="Business" id="t-type-bus">Business</option>
+                                <option value="Government" id="t-type-gov">Government</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label id="t-fb-sex" class="block mb-2 text-sm font-semibold text-slate-700">Sex (Optional)</label>
+                            <select id="client-sex" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-xl focus:ring-bisu-blue focus:border-bisu-blue block w-full p-3 shadow-sm transition-all duration-200">
+                                <option value="" disabled selected id="t-sel-sex">Select Sex</option>
+                                <option value="Male" id="t-sex-m">Male</option>
+                                <option value="Female" id="t-sex-f">Female</option>
+                                <option value="Prefer not to say" id="t-sex-o">Prefer not to say</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Citizen's Charter (CC) Section -->
+                    <div class="bg-blue-50/50 p-6 rounded-2xl border border-blue-100 space-y-6 mb-8">
+                        <div class="flex items-start space-x-3">
+                            <i class="fa-solid fa-circle-info text-blue-500 text-2xl mt-1"></i>
+                            <div>
+                                <h3 class="font-bold text-slate-800 text-lg" id="t-cc-title">Citizen's Charter (CC)</h3>
+                                <p class="text-[11px] text-slate-500 leading-relaxed mt-1" id="t-cc-desc">The Citizen's Charter is an official document that reflects the services of a government agency/office including its requirements, fees, and processing time among others.</p>
+                            </div>
+                        </div>
+
+                        <!-- CC1 -->
+                        <div class="space-y-3">
+                            <label class="block text-sm font-bold text-slate-700" id="t-cc1-label">CC1. Which of the following best describes your awareness of a CC? <span class="text-red-500">*</span></label>
+                            <div class="grid grid-cols-1 gap-2">
+                                <label class="flex items-center p-3 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-bisu-blue transition-colors group">
+                                    <input type="radio" name="cc1" value="1" required class="w-4 h-4 text-bisu-blue focus:ring-bisu-blue">
+                                    <span class="ml-3 text-xs md:text-sm text-slate-600 group-hover:text-slate-900" id="t-cc1-opt1">1. I know what a CC is and I saw this office's CC.</span>
+                                </label>
+                                <label class="flex items-center p-3 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-bisu-blue transition-colors group">
+                                    <input type="radio" name="cc1" value="2" class="w-4 h-4 text-bisu-blue focus:ring-bisu-blue">
+                                    <span class="ml-3 text-xs md:text-sm text-slate-600 group-hover:text-slate-900" id="t-cc1-opt2">2. I know what a CC is but I did not see this office's CC.</span>
+                                </label>
+                                <label class="flex items-center p-3 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-bisu-blue transition-colors group">
+                                    <input type="radio" name="cc1" value="3" class="w-4 h-4 text-bisu-blue focus:ring-bisu-blue">
+                                    <span class="ml-3 text-xs md:text-sm text-slate-600 group-hover:text-slate-900" id="t-cc1-opt3">3. I learned of the CC only when I saw this office's CC.</span>
+                                </label>
+                                <label class="flex items-center p-3 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-bisu-blue transition-colors group">
+                                    <input type="radio" name="cc1" value="4" class="w-4 h-4 text-bisu-blue focus:ring-bisu-blue">
+                                    <span class="ml-3 text-xs md:text-sm text-slate-600 group-hover:text-slate-900" id="t-cc1-opt4">4. I do not know what a CC is and I did not see one in this office.</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- CC2 & CC3 -->
+                        <div id="cc-details-container" class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-blue-100">
+                             <div class="space-y-3">
+                                <label class="block text-sm font-bold text-slate-700" id="t-cc2-label">CC2. Would you say that the CC of this office was...? <span class="text-red-500">*</span></label>
+                                <select id="cc2" required class="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm focus:ring-bisu-blue transition-all">
+                                    <option value="" disabled selected id="t-cc2-sel">Select Response</option>
+                                    <option value="1" id="t-cc2-opt1">1. Easy to see</option>
+                                    <option value="2" id="t-cc2-opt2">2. Somewhat easy to see</option>
+                                    <option value="3" id="t-cc2-opt3">3. Difficult to see</option>
+                                    <option value="4" id="t-cc2-opt4">4. Not visible at all</option>
+                                    <option value="5" id="t-cc2-opt5">5. N/A</option>
+                                </select>
+                            </div>
+                            <div class="space-y-3">
+                                <label class="block text-sm font-bold text-slate-700" id="t-cc3-label">CC3. How much did the CC help you in your transaction? <span class="text-red-500">*</span></label>
+                                <select id="cc3" required class="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm focus:ring-bisu-blue transition-all">
+                                    <option value="" disabled selected id="t-cc3-sel">Select Response</option>
+                                    <option value="1" id="t-cc3-opt1">Helped very much</option>
+                                    <option value="2" id="t-cc3-opt2">Somewhat helped</option>
+                                    <option value="3" id="t-cc3-opt3">Did not help</option>
+                                    <option value="4" id="t-cc3-opt4">N/A</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Likert Scale Instructions -->
+                    <div class="mb-4">
+                        <div class="flex flex-wrap items-center gap-4 text-xs md:text-sm font-medium text-slate-500 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                            <span class="font-bold text-slate-700 mr-2 uppercase tracking-wider text-xs flex items-center" id="t-fb-inst-strong"><i class="fa-solid fa-circle-info text-blue-500 mr-2"></i> Rating Scale</span> 
+                            <span class="flex items-center"><span class="w-6 h-6 flex items-center justify-center rounded-full bg-bisu-gold text-white font-bold mr-1.5 text-xs">5</span> <span id="t-fb-vs1">Very Satisfied</span></span>
+                            <span class="flex items-center"><span class="w-6 h-6 flex items-center justify-center rounded-full bg-slate-400 text-white font-bold mr-1.5 text-xs">3</span> <span id="t-fb-neu">Neutral</span></span>
+                            <span class="flex items-center"><span class="w-6 h-6 flex items-center justify-center rounded-full bg-bisu-red text-white font-bold mr-1.5 text-xs">1</span> <span id="t-fb-vd1">Very Dissatisfied</span></span>
+                        </div>
+                    </div>
+
+                    <!-- 8 Dimensions -->
+                    <div class="space-y-4" id="dimensions-container">
+                        <!-- Rendered via JS -->
+                    </div>
+
+                    <!-- Comments and Suggestions -->
+                    <div class="space-y-4">
+                        <div>
+                            <label id="t-fb-commend" class="block mb-2 text-sm font-semibold text-slate-700">Commendations (Optional)</label>
+                            <textarea id="commendations" rows="2" class="block p-3 w-full text-sm text-gray-900 bg-gray-50 rounded-xl border border-gray-300 focus:ring-bisu-blue focus:border-bisu-blue" placeholder="Any praise for our staff or service?"></textarea>
+                        </div>
+                        <div>
+                            <label id="t-fb-suggest" class="block mb-2 text-sm font-semibold text-slate-700">Suggestions (Optional)</label>
+                            <textarea id="suggestions" rows="2" class="block p-3 w-full text-sm text-gray-900 bg-gray-50 rounded-xl border border-gray-300 focus:ring-bisu-blue focus:border-bisu-blue" placeholder="How can we improve?"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Submit Actions -->
+                    <div class="flex flex-col md:flex-row items-center justify-between pt-4 border-t border-slate-200 mt-6 md:space-y-0 space-y-4">
+                        <button type="button" id="toggle-complaint-btn" class="text-bisu-red hover:text-red-800 font-semibold text-sm underline flex items-center">
+                            <i class="fa-solid fa-triangle-exclamation mr-1"></i> <span id="t-fb-comp-link">File a Formal Complaint instead</span>
+                        </button>
+                        <button type="submit" id="submit-feedback-btn" class="w-full md:w-auto text-white bg-bisu-blue hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-bold rounded-xl text-lg px-8 py-3.5 text-center shadow-lg transition-transform transform hover:-translate-y-1">
+                            <i class="fa-regular fa-paper-plane mr-2"></i> <span id="t-fb-submit">Submit Feedback</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- VIEW: Complaint Form -->
+        <section id="view-complaint" class="space-y-6 section-hidden animate-slide-up">
+            <div class="glass border-t-4 border-bisu-red p-6 md:p-8 rounded-2xl shadow-sm">
+                <div class="flex justify-between items-center mb-6 pb-4 border-b border-red-100">
+                    <h2 class="text-2xl font-bold text-bisu-red"><i class="fa-solid fa-file-signature mr-2"></i> <span id="t-cp-title">Formal Complaint Form</span></h2>
+                    <button type="button" id="back-to-feedback-btn" class="text-slate-500 hover:text-slate-700 font-medium text-sm flex items-center bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors">
+                        <i class="fa-solid fa-arrow-left mr-1"></i> <span id="t-cp-back">Back</span>
+                    </button>
+                </div>
+                
+                <p id="t-cp-desc" class="text-sm text-slate-600 mb-6 bg-red-50 p-4 rounded-xl border border-red-100 italic">
+                    This form is given to any client experiencing dissatisfaction. Data is handled with strict confidentiality per the Data Privacy Act.
+                </p>
+
+                <form id="complaint-form" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div class="md:col-span-2">
+                           <h3 id="t-cp-h1" class="font-bold text-slate-800 border-b pb-1 mb-3">Details of Complainant (Optional for anonymity)</h3> 
+                        </div>
+                        <div>
+                            <label id="t-cp-name" class="block mb-1 text-sm font-medium text-slate-700">Name</label>
+                            <input type="text" id="comp-name" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-bisu-red focus:border-bisu-red block w-full p-2.5">
+                        </div>
+                        <div>
+                            <label id="t-cp-contact" class="block mb-1 text-sm font-medium text-slate-700">Contact Details</label>
+                            <input type="text" id="comp-contact" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-bisu-red focus:border-bisu-red block w-full p-2.5">
+                        </div>
+                        
+                        <div class="md:col-span-2 mt-4">
+                           <h3 id="t-cp-h2" class="font-bold text-slate-800 border-b pb-1 mb-3">Complaint Details</h3> 
+                        </div>
+                        
+                        <div>
+                            <label id="t-cp-date" class="block mb-1 text-sm font-medium text-slate-700">Date of Incident <span class="text-red-500">*</span></label>
+                            <input type="date" id="comp-date" required class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-bisu-red focus:border-bisu-red block w-full p-2.5">
+                        </div>
+                        <div>
+                            <label id="t-cp-place" class="block mb-1 text-sm font-medium text-slate-700">Place of Incident <span class="text-red-500">*</span></label>
+                            <input type="text" id="comp-place" required class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-bisu-red focus:border-bisu-red block w-full p-2.5">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label id="t-cp-act" class="block mb-1 text-sm font-medium text-slate-700">Act/s Complained of / Details <span class="text-red-500">*</span></label>
+                            <input type="text" id="comp-details" required class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-bisu-red focus:border-bisu-red block w-full p-2.5">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label id="t-cp-narr" class="block mb-1 text-sm font-medium text-slate-700">Narrative Report <span class="text-red-500">*</span></label>
+                            <textarea id="comp-narrative" rows="4" required class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-bisu-red focus:border-bisu-red block w-full p-2.5" placeholder="Please describe exactly what happened..."></textarea>
+                        </div>
+                        <div class="md:col-span-2">
+                            <label id="t-cp-out" class="block mb-1 text-sm font-medium text-slate-700">Desired Outcome <span class="text-red-500">*</span></label>
+                            <textarea id="comp-outcome" rows="2" required class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-bisu-red focus:border-bisu-red block w-full p-2.5" placeholder="As a result of making this complaint, what outcome would you expect?"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="flex items-start mt-6 bg-slate-50 p-4 rounded-lg">
+                        <div class="flex items-center h-5">
+                            <input id="comp-truth" type="checkbox" required class="w-5 h-5 text-bisu-red bg-gray-100 border-gray-300 rounded focus:ring-bisu-red">
+                        </div>
+                        <label for="comp-truth" id="t-cp-bind" class="ml-3 text-sm font-medium text-slate-600">
+                            I bind myself to stand on the truth of this complaint on behalf of the public and the institution.
+                        </label>
+                    </div>
+
+                    <div class="flex justify-end pt-4">
+                        <button type="submit" id="submit-complaint-btn" class="w-full md:w-auto text-white bg-bisu-red hover:bg-red-800 focus:ring-4 focus:ring-red-300 font-bold rounded-xl text-lg px-8 py-3.5 text-center shadow-lg transition-transform transform hover:-translate-y-1">
+                            <i class="fa-solid fa-file-shield mr-2"></i> <span id="t-cp-submit">Submit Complaint</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- VIEW: Admin Dashboard -->
+        <section id="view-admin" class="section-hidden animate-slide-up w-full max-w-7xl mx-auto -mx-4 sm:mx-0">
+            <div class="glass p-6 rounded-2xl shadow-sm border border-slate-200 print:bg-white print:border-none print:shadow-none print:p-0">
+                
+                <!-- Print Letterhead (Visible ONLY during print) -->
+                <div id="print-header" class="hidden print:flex flex-col items-center justify-center mb-8 pb-6 w-full pt-4">
+                    <div class="flex space-x-8 items-center mb-4">
+                        <img src="images/BISU.png" class="w-24 h-24 object-contain" alt="BISU">
+                        <img src="images/BAGONG-PILIPINAS-LOGO-1-1.png" class="w-24 h-24 object-contain" alt="Bagong Pilipinas">
+                        <img src="images/images.png" class="w-24 h-24 object-contain rounded" alt="TUV Rheinland">
+                    </div>
+                    <div class="text-center font-serif text-slate-900 border-b border-slate-400 w-full max-w-5xl pb-6 mb-6">
+                        <h1 class="text-2xl font-bold uppercase tracking-wide">Bohol Island State University</h1>
+                        <h2 class="text-lg font-semibold uppercase tracking-widest mt-1 text-slate-700">Calape Campus</h2>
+                        <p class="text-sm italic text-slate-500 mt-2">Quality Management System - Official Report</p>
+                    </div>
+
+                    <!-- Campus Summary Title -->
+                    <h2 id="print-title-summary" class="text-xl font-bold text-slate-900 uppercase">MONTHLY CUSTOMER SATISFACTION SUMMARY FORM - <span class="border-b border-black inline-block px-12">(Month, Day, Year)</span></h2>
+                    
+                    <!-- Individual Report Card Title (Toggled via JS) -->
+                    <div id="print-title-report" class="hidden w-full max-w-5xl">
+                        <h2 class="text-2xl font-bold text-slate-900 uppercase text-center mb-6">MONTHLY REPORT CARD</h2>
+                        <div class="flex justify-between items-end text-sm font-bold uppercase">
+                            <div>Office Concerned : <span id="print-office-concerned" class="border-b border-black inline-block w-64 px-2">_____________________</span></div>
+                            <div>Month : <span class="border-b border-black inline-block w-48 px-2">_____________________</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-3 print:hidden">
+                    <h2 class="text-2xl font-bold text-slate-800"><i class="fa-solid fa-chart-pie mr-2 text-bisu-blue"></i> Admin Dashboard</h2>
+                    <div class="flex space-x-2">
+                        <button onclick="printAll()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-bold shadow-sm transition"><i class="fa-solid fa-print mr-1"></i> Print Dashboard</button>
+                        <button id="admin-settings-btn" class="px-4 py-2 bg-bisu-gold text-bisu-blue hover:bg-yellow-500 rounded-lg text-sm font-bold transition-colors shadow-sm"><i class="fa-solid fa-sliders mr-1"></i> Form Settings</button>
+                        <button id="logout-admin-btn" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg text-sm font-medium transition-colors"><i class="fa-solid fa-door-open mr-1"></i> Close</button>
+                    </div>
+                </div>
+
+                <!-- Form Settings Modal -->
+                <div id="admin-settings-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] hidden items-center justify-center p-4 transition-opacity">
+                    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-[90vw] h-[90vh] flex flex-col p-6 md:p-8 animate-pop-in">
+                        <div class="flex items-center border-b pb-3 mb-4">
+                            <h3 class="text-xl font-bold text-slate-800"><i class="fa-solid fa-sliders text-bisu-blue mr-2"></i> Form Settings</h3>
+                        </div>
+                        
+                        <div class="flex-grow overflow-y-auto space-y-6 pr-2 custom-scrollbar">
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-700 mb-1">Offices Available (One per line)</label>
+                                <textarea id="config-offices" rows="3" class="w-full max-w-2xl border border-slate-300 rounded-xl p-3 focus:ring-bisu-blue shadow-sm bg-slate-50"></textarea>
+                            </div>
+                            <div class="pt-3 border-t">
+                                <label class="block text-sm font-semibold text-slate-700 mb-2">Rating Questions Configuration</label>
+                                <p class="text-xs text-slate-500 mb-4">Manage the questions asked to the user below.</p>
+                                
+                                <div id="config-dimensions-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-4">
+                                    <!-- Rendered dynamically -->
+                                </div>
+                                
+                                <button type="button" id="add-dimension-btn" class="w-full bg-slate-50 hover:bg-green-50 text-slate-600 hover:text-green-600 border-2 border-dashed border-slate-300 hover:border-green-400 font-bold py-4 rounded-xl transition flex items-center justify-center">
+                                    <i class="fa-solid fa-circle-plus text-xl mr-2"></i> Add New Question
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4 pt-4 border-t flex justify-end space-x-3">
+                            <button type="button" id="close-settings-btn" class="px-5 py-2.5 text-slate-600 font-bold hover:bg-slate-100 rounded-xl transition">Cancel</button>
+                            <button type="button" id="save-settings-btn" class="px-5 py-2.5 bg-bisu-blue text-white font-bold rounded-xl hover:bg-blue-800 transition shadow-md"><i class="fa-solid fa-floppy-disk mr-2"></i> Save Changes</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stats Overview -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center">
+                        <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xl mr-4"><i class="fa-solid fa-users"></i></div>
+                        <div><p class="text-sm text-slate-500 font-medium">Total Feedbacks</p><p id="stat-total" class="text-2xl font-bold text-slate-800">0</p></div>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center">
+                        <div class="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-xl mr-4"><i class="fa-solid fa-star"></i></div>
+                        <div><p class="text-sm text-slate-500 font-medium">Avg Satisfaction</p><p id="stat-avg" class="text-2xl font-bold text-slate-800">0.0</p></div>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center">
+                        <div class="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-xl mr-4"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                        <div><p class="text-sm text-slate-500 font-medium">Complaints</p><p id="stat-complaints" class="text-2xl font-bold text-slate-800">0</p></div>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 border-dashed flex flex-col justify-center items-center text-center p-6 bg-slate-50/50">
+                         <button id="refresh-data-btn" class="w-full py-2 bg-bisu-blue text-white rounded-lg hover:bg-blue-800 transition text-sm font-medium shadow-sm">
+                            <i class="fa-solid fa-rotate-right mr-1"></i> Refresh Dashboard
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Individual Report Card Generator Tool -->
+                <div class="bg-white rounded-2xl border-2 border-bisu-blue/20 p-6 mb-8 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6 print:hidden">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-14 h-14 bg-bisu-blue text-white rounded-2xl flex items-center justify-center text-2xl shadow-lg ring-4 ring-blue-50"><i class="fa-solid fa-id-card"></i></div>
+                        <div>
+                            <h3 class="font-bold text-slate-900 text-lg">Individual Monthly Report Card (MRC)</h3>
+                            <p class="text-sm text-slate-500">Generate a dedicated report for a specific office without campus-wide data.</p>
+                        </div>
+                    </div>
+                    <div class="flex flex-col sm:flex-row items-stretch gap-3 w-full md:w-auto">
+                        <div class="relative min-w-[240px]">
+                            <select id="office-report-card-select" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-sm focus:border-bisu-blue focus:ring-0 appearance-none bg-white">
+                                <option value="">Select Target Office...</option>
+                            </select>
+                            <div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 font-bold"><i class="fa-solid fa-chevron-down"></i></div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="generateOfficeReportCard()" class="flex-1 md:flex-none px-6 py-3 bg-slate-800 text-white rounded-xl hover:bg-black transition-all font-bold shadow-md hover:shadow-lg flex items-center justify-center gap-2 whitespace-nowrap">
+                                <i class="fa-solid fa-print"></i> Generate MRC
+                            </button>
+                            <button onclick="sendReportToService('MRC')" class="flex-1 md:flex-none px-6 py-3 bg-bisu-gold text-bisu-blue rounded-xl hover:bg-yellow-500 transition-all font-bold shadow-md hover:shadow-lg flex items-center justify-center gap-2 whitespace-nowrap">
+                                <i class="fa-solid fa-paper-plane"></i> Send to Q.A.
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-center mb-8 border-b border-slate-200 pb-6 print:hidden">
+                    <h2 class="text-xl md:text-2xl font-bold bg-gradient-to-r from-bisu-blue to-blue-700 bg-clip-text text-transparent uppercase tracking-tight">MONTHLY CUSTOMER SATISFACTION SUMMARY FORM</h2>
+                    <p class="text-sm text-slate-500 font-medium mt-1">Quality Management System - Official Summary Report (A, B, and C)</p>
+                </div>
+
+                <!-- Citizen's Charter Summary Result Section -->
+                <div id="section-table-a" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8">
+                    <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+                        <div class="flex items-center space-x-3">
+                            <h3 class="font-bold text-lg text-bisu-blue">A. Citizen's Charter Summary Result</h3>
+                            <button onclick="printSpecificTable('table-a')" class="text-slate-500 hover:text-bisu-blue transition-colors print:hidden" title="Print Table A"><i class="fa-solid fa-print"></i></button>
+                            <button onclick="sendReportToService('Table A')" class="text-slate-500 hover:text-bisu-gold transition-colors print:hidden" title="Send Table A"><i class="fa-solid fa-paper-plane text-sm"></i></button>
+                        </div>
+                    </div>
+                    <div class="p-4 overflow-x-auto custom-scrollbar">
+                        <table class="w-full text-sm text-center text-slate-600 border-collapse">
+                            <thead class="text-xs text-slate-700 uppercase bg-slate-100">
+                                <tr>
+                                    <th rowspan="2" class="px-4 py-3 border align-middle col-office">Offices</th>
+                                    <th rowspan="2" class="px-2 py-3 border align-middle">Number of<br>Customers (f)</th>
+                                    <th colspan="2" class="px-4 py-2 border">Sex</th>
+                                    <th colspan="3" class="px-4 py-2 border">Client Type</th>
+                                    <th colspan="6" class="px-4 py-2 border">CC1</th>
+                                    <th colspan="5" class="px-4 py-2 border">CC2</th>
+                                    <th colspan="2" class="px-4 py-2 border">CC3</th>
+                                </tr>
+                                <tr>
+                                    <!-- Sex -->
+                                    <th class="px-2 py-2 border">M</th>
+                                    <th class="px-2 py-2 border">F</th>
+                                    <!-- Client Type -->
+                                    <th class="px-2 py-2 border">Citizen</th>
+                                    <th class="px-2 py-2 border">Business</th>
+                                    <th class="px-2 py-2 border text-[10px]">Government</th>
+                                    <!-- CC1 -->
+                                    <th class="px-1 py-2 border whitespace-nowrap">CC 1-1</th>
+                                    <th class="px-1 py-2 border whitespace-nowrap">CC 1-2</th>
+                                    <th class="px-1 py-2 border whitespace-nowrap">CC 1-3</th>
+                                    <th class="px-1 py-2 border whitespace-nowrap">CC 1-4</th>
+                                    <!-- CC2 -->
+                                    <th class="px-1 py-2 border whitespace-nowrap">CC 2-1</th>
+                                    <th class="px-1 py-2 border whitespace-nowrap">CC 2-2</th>
+                                    <th class="px-1 py-2 border whitespace-nowrap">CC 2-3</th>
+                                    <th class="px-1 py-2 border whitespace-nowrap">CC 2-4</th>
+                                    <th class="px-1 py-2 border whitespace-nowrap">CC 2-5</th>
+                                    <!-- CC3 -->
+                                    <th class="px-1 py-2 border whitespace-nowrap">CC 3-1</th>
+                                    <th class="px-1 py-2 border whitespace-nowrap">CC 3-2</th>
+                                    <th class="px-1 py-2 border whitespace-nowrap">CC 3-3</th>
+                                    <th class="px-1 py-2 border whitespace-nowrap">CC 3-4</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cc-table-body">
+                                <tr><td colspan="19" class="px-4 py-4 text-center text-slate-400">Loading data...</td></tr>
+                            </tbody>
+                            <tfoot id="cc-table-foot" class="font-bold bg-slate-50">
+                                <!-- Overall Rating dynamically generated -->
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Monthly Report Card Section -->
+                <div id="section-table-b" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8">
+                    <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-end pb-3">
+                        <div class="flex items-center space-x-3">
+                            <h3 class="font-bold text-lg text-bisu-blue">B. CSF Monthly Rating</h3>
+                            <button onclick="printSpecificTable('table-b')" class="text-slate-500 hover:text-bisu-blue transition-colors print:hidden" title="Print Table B"><i class="fa-solid fa-print"></i></button>
+                            <button onclick="sendReportToService('Table B')" class="text-slate-500 hover:text-bisu-gold transition-colors print:hidden" title="Send Table B"><i class="fa-solid fa-paper-plane text-sm"></i></button>
+                        </div>
+                        <div class="text-sm font-semibold text-slate-700 flex items-end">
+                            <span class="mr-2">Campus:</span> <span id="csf-campus" class="border-b-2 border-slate-900 inline-block w-48 px-2 text-center text-bisu-blue font-bold">CALAPE</span>
+                        </div>
+                    </div>
+                    <div class="p-4 overflow-x-auto custom-scrollbar">
+                        <table class="w-full text-[13px] text-center text-slate-600 whitespace-nowrap border-collapse">
+                            <thead id="report-table-head" class="text-xs text-slate-800 bg-slate-100 font-bold uppercase">
+                                <tr>
+                                    <th class="px-4 py-3 border col-office">Offices</th>
+                                    <th class="px-4 py-3 border">Number of<br>Customers (f)</th>
+                                    <th class="px-4 py-3 border">Responsiveness</th>
+                                    <th class="px-4 py-3 border">Reliability<br>(Quality)</th>
+                                    <th class="px-4 py-3 border">Access &<br>Facilities</th>
+                                    <th class="px-4 py-3 border">Communication</th>
+                                    <th class="px-4 py-3 border">Costs</th>
+                                    <th class="px-4 py-3 border">Integrity</th>
+                                    <th class="px-4 py-3 border">Assurance</th>
+                                    <th class="px-4 py-3 border">Outcome</th>
+                                    <th class="px-4 py-3 border bg-blue-50/50">Mean<br>Satisfaction</th>
+                                    <th class="px-4 py-3 border">Description</th>
+                                </tr>
+                            </thead>
+                            <tbody id="report-table-body">
+                                <tr><td colspan="12" class="px-4 py-8 text-center text-slate-400 italic">No data retrieved yet.</td></tr>
+                            </tbody>
+                            <tfoot id="report-table-foot" class="font-bold bg-slate-50">
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+
+        <!-- CSF Monthly Commendations & Suggestions Section -->
+                <div id="section-table-c" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8">
+                    <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center flex-wrap gap-4">
+                        <div class="flex items-center space-x-3">
+                            <h3 class="font-bold text-lg text-bisu-blue">C. CSF Monthly Commendations and Suggestions</h3>
+                            <button onclick="printSpecificTable('table-c')" class="text-slate-500 hover:text-bisu-blue transition-colors print:hidden" title="Print Table C"><i class="fa-solid fa-print"></i></button>
+                            <button onclick="sendReportToService('Table C')" class="text-slate-500 hover:text-bisu-gold transition-colors print:hidden" title="Send Table C"><i class="fa-solid fa-paper-plane text-sm"></i></button>
+                        </div>
+                    </div>
+                    <div class="p-4 overflow-x-auto custom-scrollbar">
+                        <table class="w-full text-sm text-center text-slate-600 border-collapse">
+                            <thead class="text-xs text-slate-700 uppercase bg-slate-100">
+                                <tr>
+                                    <th rowspan="2" class="px-4 py-3 border align-middle col-office">Office</th>
+                                    <th rowspan="2" class="px-4 py-3 border align-middle">Commendations</th>
+                                    <th rowspan="2" class="px-4 py-3 border align-middle">Detail of<br>Suggestions</th>
+                                    <th rowspan="2" class="px-4 py-3 border align-middle">Root<br>Cause</th>
+                                    <th rowspan="2" class="px-4 py-3 border align-middle">Action<br>Plan</th>
+                                    <th rowspan="2" class="px-4 py-3 border align-middle">Target of<br>Implementation</th>
+                                    <th colspan="3" class="px-4 py-2 border">Status of Implementation</th>
+                                </tr>
+                                <tr>
+                                    <th class="px-2 py-2 border">Implemented<br>(Closed)</th>
+                                    <th class="px-2 py-2 border">On-going / To be Implemented<br>(Open)</th>
+                                    <th class="px-2 py-2 border">Not<br>Implemented</th>
+                                </tr>
+                            </thead>
+                            <tbody id="commendations-table-body">
+                                <tr><td colspan="9" class="px-4 py-4 text-center text-slate-400">Loading data...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Submissions Tracking (For Offices to Check) -->
+                <div id="section-log" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+                        <h3 class="font-bold text-lg text-slate-800">Recent Submissions (Verification Log)</h3>
+                    </div>
+                    <div class="p-4 overflow-x-auto custom-scrollbar">
+                         <table class="w-full text-sm text-left text-slate-600">
+                            <thead class="text-xs text-slate-700 uppercase bg-slate-100">
+                                <tr>
+                                    <th scope="col" class="px-4 py-3">Time</th>
+                                    <th scope="col" class="px-4 py-3">Office</th>
+                                    <th scope="col" class="px-4 py-3">Client Type</th>
+                                    <th scope="col" class="px-4 py-3">Type</th>
+                                    <th scope="col" class="px-4 py-3 text-right">Score</th>
+                                </tr>
+                            </thead>
+                            <tbody id="log-table-body">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Print Footer (Sign-offs) - Visible ONLY during print -->
+                <div id="print-footer" class="hidden print:block mt-12 w-full mx-auto font-serif text-sm">
+                    <div class="grid grid-cols-2 gap-x-12 gap-y-10 mb-10 w-full px-4">
+                        <!-- Prepared By -->
+                        <div class="space-y-1">
+                            <p class="font-bold">Prepared by:</p>
+                            <div class="pt-10 border-b border-black w-full text-center">
+                                <span class="text-[10px] text-slate-500 font-normal italic uppercase tracking-tighter">Name & Signature of Chairperson, Customer Satisfaction Assessment Team</span>
+                            </div>
+                        </div>
+
+                        <!-- Verified By -->
+                        <div class="space-y-1">
+                            <p class="font-bold">Verified by:</p>
+                            <div class="pt-10 border-b border-black w-full text-center">
+                                <span class="text-[10px] text-slate-500 font-normal italic uppercase tracking-tighter">Name & Signature of Campus Quality Assurance Director</span>
+                            </div>
+                        </div>
+
+                        <!-- Approved By -->
+                        <div class="space-y-1 col-span-2 max-w-sm mx-auto mt-6 text-center">
+                            <p class="font-bold text-left">Approved by:</p>
+                            <div class="pt-10 border-b border-black w-full">
+                                <span class="text-[10px] text-slate-500 font-normal italic uppercase tracking-tighter">Name & Signature of Campus Director</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Document Tracking Code -->
+                    <div class="flex justify-between items-end pt-8 text-[10px] text-slate-400 font-sans mt-12 px-2">
+                        <div>F-AQA-CSF-001 | Rev. 3 | 09/09/25</div>
+                        <div class="font-bold text-slate-600">Page 1 of 1</div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="bg-slate-900 text-slate-400 py-4 mt-auto">
+        <div class="max-w-7xl mx-auto px-4 text-center text-sm">
+            <p>&copy; <span id="current-year"></span> Bohol Island State University - Calape Campus. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- Supabase JS CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabaseClient.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
