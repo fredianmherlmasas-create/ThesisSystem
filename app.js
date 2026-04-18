@@ -42,11 +42,30 @@ document.addEventListener('DOMContentLoaded', () => {
     const viewComplaint = document.getElementById('view-complaint');
     const viewAdmin = document.getElementById('view-admin');
 
+    // Admin Login Modal
+    const adminLoginModal = document.getElementById('admin-login-modal');
+    const closeLoginBtn = document.getElementById('close-login-btn');
+    const adminLoginForm = document.getElementById('admin-login-form');
+    const loginEmailInput = document.getElementById('login-email');
+    const loginPasswordInput = document.getElementById('login-password');
+    const submitLoginBtn = document.getElementById('submit-login-btn');
+
+    // Admin Account Management Modal
+    const manageAccountsBtn = document.getElementById('manage-accounts-btn');
+    const manageAccountsModal = document.getElementById('manage-accounts-modal');
+    const closeAccountsBtn = document.getElementById('close-accounts-btn');
+    const officeAccountForm = document.getElementById('office-account-form');
+    const accOfficeSelect = document.getElementById('acc-office');
+    const accEmailInput = document.getElementById('acc-email');
+    const accPasswordInput = document.getElementById('acc-password');
+    const submitAccBtn = document.getElementById('submit-acc-btn');
+    const accountsTableBody = document.getElementById('accounts-table-body');
+    const settingsBtn = document.getElementById('admin-settings-btn');
+
     // Consent
     const consentCheckbox = document.getElementById('consent-checkbox');
     const acceptConsentBtn = document.getElementById('accept-consent-btn');
 
-    // Navigation Buttons
     const toggleComplaintBtn = document.getElementById('toggle-complaint-btn');
     const backToFeedbackBtn = document.getElementById('back-to-feedback-btn');
     const adminLoginBtn = document.getElementById('admin-login-btn');
@@ -280,8 +299,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return null;
     }
 
-    const EVALUATION_TABLE = 'evaluations';
-    const LEGACY_FEEDBACK_TABLE = 'feedbacks';
+    // Canonical Table Names
+    const FEEDBACK_TABLE = 'feedbacks';
+    const COMPLAIN_TABLE = 'complaints';
+    const SETTINGS_TABLE = 'admin_settings';
 
     function isMissingTableError(error) {
         if (!error) return false;
@@ -290,32 +311,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function insertEvaluations(client, rows) {
-        const attempt = await client.from(EVALUATION_TABLE).insert(rows);
-        if (!attempt.error) {
-            // Keep legacy dashboard/data sources aligned while transitioning tables.
-            const legacyAttempt = await client.from(LEGACY_FEEDBACK_TABLE).insert(rows);
-            if (legacyAttempt.error && !isMissingTableError(legacyAttempt.error)) {
-                console.warn('Legacy feedback mirror insert failed:', legacyAttempt.error);
-            }
-            return attempt;
-        }
-
-        if (isMissingTableError(attempt.error)) {
-            return await client.from(LEGACY_FEEDBACK_TABLE).insert(rows);
-        }
-
-        return attempt;
+        // Direct insert into the feedbacks table
+        return await client.from(FEEDBACK_TABLE).insert(rows);
     }
 
     async function selectEvaluations(client) {
-        const attempt = await client.from(EVALUATION_TABLE).select('*').order('created_at', { ascending: false });
-        if (!attempt.error) return attempt;
-
-        if (isMissingTableError(attempt.error)) {
-            return await client.from(LEGACY_FEEDBACK_TABLE).select('*').order('created_at', { ascending: false });
-        }
-
-        return attempt;
+        // Directly select from the feedbacks table
+        return await client.from(FEEDBACK_TABLE).select('*').order('created_at', { ascending: false });
     }
 
     async function loadFormConfigFromDatabase() {
@@ -346,7 +348,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const populateSelect = (el) => {
             if(!el) return;
             const originalVal = el.value;
-            el.innerHTML = `<option value="">${el.id === 'office-visited' ? 'Select Office' : 'Select Office for Card'}</option>`;
+            let defaultText = 'Select Option';
+            if (el.id === 'office-visited') defaultText = 'Select Office';
+            else if (el.id === 'acc-office') defaultText = 'Select Target Office';
+            else if (el.id === 'office-report-card-select') defaultText = 'Select Office for Card';
+            
+            el.innerHTML = `<option value="">${defaultText}</option>`;
             formConfig.offices.forEach(office => {
                 el.innerHTML += `<option value="${office}">${office}</option>`;
             });
@@ -355,6 +362,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         populateSelect(officeSelect);
         populateSelect(reportCardSelect);
+        populateSelect(accOfficeSelect);
     }
 
     window.generateOfficeReportCard = function() {
@@ -550,47 +558,211 @@ document.addEventListener('DOMContentLoaded', () => {
         return !!adminData;
     }
 
-    adminLoginBtn.addEventListener('click', async () => {
+    adminLoginBtn.addEventListener('click', () => {
+        adminLoginModal.classList.remove('hidden');
+        adminLoginModal.classList.add('flex');
+        document.body.style.overflow = 'hidden';
+        setTimeout(() => loginEmailInput.focus(), 100);
+    });
+
+    closeLoginBtn.addEventListener('click', () => {
+        adminLoginModal.classList.add('hidden');
+        adminLoginModal.classList.remove('flex');
+        document.body.style.overflow = '';
+        adminLoginForm.reset();
+    });
+
+    adminLoginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
         const client = await getSupabaseClient();
         if (!client) {
             showToast('Supabase is not connected. Please check your project keys.', 'error');
             return;
         }
 
-        const email = prompt('Enter admin email:');
-        if (email === null || email.trim() === '') return;
+        const email = loginEmailInput.value.trim();
+        const password = loginPasswordInput.value;
 
-        const password = prompt('Enter admin password:');
-        if (password === null || password === '') return;
+        submitLoginBtn.disabled = true;
+        submitLoginBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Logging in...';
 
-        const { error: signInError } = await client.auth.signInWithPassword({
-            email: email.trim(),
-            password
+        try {
+            const { error: signInError } = await client.auth.signInWithPassword({
+                email,
+                password
+            });
+
+            if (signInError) {
+                showToast(`Login failed: ${signInError.message}`, 'error');
+                return;
+            }
+
+            const adminAllowed = await isCurrentUserAdmin(client);
+            if (!adminAllowed) {
+                await client.auth.signOut();
+                showToast('Account is not registered as admin.', 'error');
+                return;
+            }
+
+            adminLoginModal.classList.add('hidden');
+            adminLoginModal.classList.remove('flex');
+            document.body.style.overflow = '';
+            adminLoginForm.reset();
+            openAdminView();
+            fetchAdminData();
+        } finally {
+            submitLoginBtn.disabled = false;
+            submitLoginBtn.innerHTML = 'Login to Dashboard';
+        }
+    });
+
+    if (logoutAdminBtn) {
+        logoutAdminBtn.addEventListener('click', async () => {
+            const client = await getSupabaseClient();
+            if (client) {
+                await client.auth.signOut();
+            }
+            closeAdminView();
         });
+    }
 
-        if (signInError) {
-            showToast('Login failed. Check your email/password.', 'error');
-            return;
-        }
+    // --- Complaints Modal Logic ---
+    const adminComplaintsModal = document.getElementById('admin-complaints-modal');
+    const closeComplaintsBtn = document.getElementById('close-complaints-btn');
+    const viewComplaintsBtn = document.getElementById('view-complaints-btn');
+    
+    if (viewComplaintsBtn && adminComplaintsModal) {
+        viewComplaintsBtn.addEventListener('click', () => {
+            adminComplaintsModal.classList.remove('hidden');
+            adminComplaintsModal.classList.add('flex');
+            document.body.style.overflow = 'hidden';
+        });
+    }
 
-        const adminAllowed = await isCurrentUserAdmin(client);
-        if (!adminAllowed) {
-            await client.auth.signOut();
-            showToast('Account is not registered as admin.', 'error');
-            return;
-        }
+    if (closeComplaintsBtn && adminComplaintsModal) {
+        closeComplaintsBtn.addEventListener('click', () => {
+            adminComplaintsModal.classList.add('hidden');
+            adminComplaintsModal.classList.remove('flex');
+            document.body.style.overflow = '';
+        });
+    }
 
-        openAdminView();
-        fetchAdminData();
-    });
+    // --- Accounts Management Logic ---
 
-    logoutAdminBtn.addEventListener('click', async () => {
+    async function fetchOfficeAccounts() {
+        if (!accountsTableBody) return;
         const client = await getSupabaseClient();
-        if (client) {
-            await client.auth.signOut();
+        if (!client) return;
+
+        const { data, error } = await client.from('office_accounts').select('*').order('office_name', { ascending: true });
+        
+        accountsTableBody.innerHTML = '';
+        if (error || !data || data.length === 0) {
+            accountsTableBody.innerHTML = `<tr><td colspan="3" class="px-4 py-8 text-center text-slate-400 italic">No office accounts registered.</td></tr>`;
+            return;
         }
-        closeAdminView();
-    });
+
+        data.forEach(acc => {
+            const tr = document.createElement('tr');
+            tr.className = 'border-b border-slate-100 last:border-0 hover:bg-slate-50 transition';
+            tr.innerHTML = `
+                <td class="px-4 py-3 font-semibold text-bisu-blue">${acc.office_name}</td>
+                <td class="px-4 py-3">${acc.email}</td>
+                <td class="px-4 py-3 text-right">
+                    <button onclick="deleteOfficeAccount(${acc.id})" class="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg text-xs font-bold transition">Delete</button>
+                </td>
+            `;
+            accountsTableBody.appendChild(tr);
+        });
+    }
+
+    if(manageAccountsBtn) {
+        manageAccountsBtn.addEventListener('click', () => {
+            manageAccountsModal.classList.remove('hidden');
+            manageAccountsModal.classList.add('flex');
+            document.body.style.overflow = 'hidden';
+            fetchOfficeAccounts();
+        });
+    }
+
+    if(closeAccountsBtn) {
+        closeAccountsBtn.addEventListener('click', () => {
+            manageAccountsModal.classList.add('hidden');
+            manageAccountsModal.classList.remove('flex');
+            document.body.style.overflow = '';
+            if(officeAccountForm) officeAccountForm.reset();
+        });
+    }
+
+    if(officeAccountForm) {
+        officeAccountForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const client = await getSupabaseClient();
+            if(!client) return;
+
+            const office = accOfficeSelect.value;
+            const email = accEmailInput.value.trim();
+            const password = accPasswordInput.value;
+
+            submitAccBtn.disabled = true;
+            submitAccBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Saving...';
+
+            try {
+                // Try registering the user in Auth
+                const { error: signUpError } = await client.auth.signUp({ email, password });
+                
+                if (signUpError && signUpError.message.toLowerCase().includes("already registered")) {
+                    // Try to use a custom RPC to update passwords (since frontend client cannot change other user passwords)
+                    const { error: rpcError } = await client.rpc('admin_change_user_password', { target_email: email, new_password: password });
+                    if (rpcError) {
+                        console.warn('RPC missing or failed:', rpcError);
+                        showToast('Notice: Email exists. Could not change password automatically without Supabase backend permissions.', 'warning');
+                    } else {
+                        showToast('Password updated successfully via RPC.', 'success');
+                    }
+                } else if (signUpError) {
+                    console.warn("Auth SignUp Issue: ", signUpError);
+                }
+
+                // Check if mapping exists
+                const { data: existing } = await client.from('office_accounts').select('id').eq('email', email).maybeSingle();
+
+                if (existing) {
+                    const { error } = await client.from('office_accounts').update({ office_name: office }).eq('id', existing.id);
+                    if (error) throw error;
+                    showToast('Account privileges updated.', 'success');
+                } else {
+                    const { error } = await client.from('office_accounts').insert([{ email, office_name: office }]);
+                    if (error) throw error;
+                    showToast('New office account authorized.', 'success');
+                }
+
+                officeAccountForm.reset();
+                fetchOfficeAccounts();
+            } catch (err) {
+                showToast(`Failed to save: ${err.message}`, 'error');
+            } finally {
+                submitAccBtn.disabled = false;
+                submitAccBtn.innerHTML = 'Save Credentials';
+            }
+        });
+    }
+
+    window.deleteOfficeAccount = async function(id) {
+        if(!confirm('Delete this office account? They will lose access to the dashboard immediately.')) return;
+        
+        const client = await getSupabaseClient();
+        if(!client) return;
+        
+        const { error } = await client.from('office_accounts').delete().eq('id', id);
+        if(error) {
+            showToast('Failed to delete account.', 'error');
+        } else {
+            showToast('Account deleted.', 'success');
+            fetchOfficeAccounts();
+        }
+    };
 
     document.getElementById('refresh-data-btn').addEventListener('click', fetchAdminData);
 
@@ -738,7 +910,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const client = await getSupabaseClient();
             if (navigator.onLine && client) {
-                const { error } = await client.from('complaints').insert([payload]);
+                const { error } = await client.from(COMPLAIN_TABLE).insert([payload]);
                 if (error) throw error;
                 showToast('Complaint submitted successfully.', 'success');
                 complaintForm.reset();
@@ -816,7 +988,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const pComplaints = JSON.parse(localStorage.getItem('pendingComplaints')) || [];
         if (pComplaints.length > 0) {
-            const { error } = await client.from('complaints').insert(pComplaints);
+            const { error } = await client.from(COMPLAIN_TABLE).insert(pComplaints);
             if (!error) {
                 localStorage.removeItem('pendingComplaints');
                 showToast('Offline complaints synced!', 'success');
@@ -830,8 +1002,8 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('online', syncOfflineData);
 
     // === Admin Logic ===
+    // === Admin Settings Modal Logic ===
     const adminSettingsModal = document.getElementById('admin-settings-modal');
-    const settingsBtn = document.getElementById('admin-settings-btn');
     const closeSettingsBtn = document.getElementById('close-settings-btn');
     const saveSettingsBtn = document.getElementById('save-settings-btn');
     const configOffices = document.getElementById('config-offices');
@@ -896,6 +1068,7 @@ document.addEventListener('DOMContentLoaded', () => {
             buildSettingsEditor();
             adminSettingsModal.classList.remove('hidden');
             adminSettingsModal.classList.add('flex');
+            document.body.style.overflow = 'hidden';
         });
     }
 
@@ -903,6 +1076,7 @@ document.addEventListener('DOMContentLoaded', () => {
         closeSettingsBtn.addEventListener('click', () => {
             adminSettingsModal.classList.add('hidden');
             adminSettingsModal.classList.remove('flex');
+            document.body.style.overflow = '';
         });
     }
 
@@ -942,7 +1116,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const client = await getSupabaseClient();
                 if (client) {
-                    const { error } = await client.from('admin_settings').upsert({
+                    const { error } = await client.from(SETTINGS_TABLE).upsert({
                         id: 'global_config',
                         config: formConfig,
                         updated_at: new Date().toISOString()
@@ -953,6 +1127,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 showToast('Form Settings Updated Successfully!', 'success');
                 adminSettingsModal.classList.add('hidden');
                 adminSettingsModal.classList.remove('flex');
+                document.body.style.overflow = '';
                 
                 // Re-render
                 renderDynamicFields();
@@ -1010,6 +1185,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }))
         ];
         renderLogTable(combinedLogs);
+        renderComplaintsModalList(cData);
     }
 
     function renderCCTable(data) {
@@ -1375,6 +1551,49 @@ document.addEventListener('DOMContentLoaded', () => {
                 printWin.focus();
                 setTimeout(() => { printWin.print(); printWin.close(); }, 300);
             });
+        });
+    }
+
+    function renderComplaintsModalList(cData) {
+        const container = document.getElementById('complaints-list-container');
+        if (!container) return;
+        container.innerHTML = '';
+
+        if (!cData || cData.length === 0) {
+            container.innerHTML = '<div class="text-center py-10 text-slate-400 italic">No filed complaints at this time.</div>';
+            return;
+        }
+
+        cData.forEach(c => {
+            const dateStr = new Date(c.created_at).toLocaleString();
+            const el = document.createElement('div');
+            el.className = "bg-slate-50 border border-slate-200 rounded-xl p-5 shadow-sm";
+            el.innerHTML = `
+                <div class="flex flex-col sm:flex-row justify-between mb-3 border-b border-slate-200 pb-3">
+                    <div>
+                        <h4 class="font-bold text-slate-800 text-lg">Actioned Against: <span class="text-red-600">${c.details_of_complaint || 'N/A'}</span></h4>
+                        <p class="text-xs text-slate-500 font-mono mt-1"><i class="fa-regular fa-clock"></i> ${dateStr}</p>
+                    </div>
+                    <div class="mt-2 sm:mt-0 text-right">
+                        <span class="bg-red-100 text-red-800 text-[10px] font-bold px-2 py-1 rounded uppercase shadow-sm">High Priority</span>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-sm mt-3">
+                    <div><span class="font-bold text-slate-700 block text-[10px] uppercase tracking-wider mb-0.5">Complainant</span> <span class="text-slate-900">${c.name || 'Anonymous'}</span></div>
+                    <div><span class="font-bold text-slate-700 block text-[10px] uppercase tracking-wider mb-0.5">Contact Details</span> <span class="text-slate-900">${c.contact_details || 'Not provided'}</span></div>
+                    <div><span class="font-bold text-slate-700 block text-[10px] uppercase tracking-wider mb-0.5">Date of Incident</span> <span class="text-slate-900">${c.date_of_incident}</span></div>
+                    <div><span class="font-bold text-slate-700 block text-[10px] uppercase tracking-wider mb-0.5">Place of Incident</span> <span class="text-slate-900">${c.place_of_incident}</span></div>
+                </div>
+                <div class="bg-white p-4 rounded-lg border border-slate-200 mb-3 text-sm shadow-inner">
+                    <span class="font-bold text-slate-800 block text-[10px] uppercase tracking-wider mb-1">Narrative Report:</span>
+                    <p class="text-slate-700 whitespace-pre-wrap">${c.narrative_report || 'None'}</p>
+                </div>
+                <div class="bg-red-50 p-4 rounded-lg border border-red-100 text-sm shadow-inner">
+                    <span class="font-bold text-red-900 block text-[10px] uppercase tracking-wider mb-1">Desired Outcome / Resolution:</span>
+                    <p class="text-red-800 whitespace-pre-wrap font-medium">${c.desired_outcome || 'None'}</p>
+                </div>
+            `;
+            container.appendChild(el);
         });
     }
 

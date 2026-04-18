@@ -63,8 +63,141 @@
     </header>
 
     <!-- Main Content Area -->
-    <main class="flex-grow max-w-4xl mx-auto w-full p-4 sm:p-6 lg:p-8">
+    <main class="flex-grow w-full p-4 sm:p-6 lg:p-8">
         
+        <!-- Admin Login Modal (Overlay) -->
+        <div id="admin-login-modal" class="fixed inset-0 z-[105] hidden items-center justify-center bg-slate-900 bg-opacity-50 backdrop-blur-sm transition-opacity">
+            <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 m-4 animate-pop-in">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-xl font-bold text-slate-800"><i class="fa-solid fa-lock text-bisu-blue mr-2"></i> Admin Login</h2>
+                    <button type="button" id="close-login-btn" class="text-slate-400 hover:text-slate-600 transition"><i class="fa-solid fa-xmark text-xl"></i></button>
+                </div>
+                <form id="admin-login-form" class="space-y-4">
+                    <div>
+                        <label class="block mb-1 text-sm font-semibold text-slate-700">Email Address</label>
+                        <input type="email" id="login-email" required placeholder="admin@bisu.edu.ph" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-xl focus:ring-bisu-blue focus:border-bisu-blue block w-full p-3 shadow-sm transition-all duration-200">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block mb-1 text-sm font-semibold text-slate-700">Password</label>
+                        <input type="password" id="login-password" required placeholder="••••••••" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-xl focus:ring-bisu-blue focus:border-bisu-blue block w-full p-3 shadow-sm transition-all duration-200">
+                    </div>
+                    <button type="submit" id="submit-login-btn" class="w-full text-white bg-bisu-blue hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-bold rounded-xl text-lg px-5 py-3 text-center transition-all duration-200 shadow-md">
+                        Login to Dashboard
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Form Settings Modal -->
+        <div id="admin-settings-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] hidden items-center justify-center p-4 transition-opacity">
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-[90vw] h-[90vh] flex flex-col p-6 md:p-8 animate-pop-in">
+                <div class="flex items-center border-b pb-3 mb-4">
+                    <h3 class="text-xl font-bold text-slate-800"><i class="fa-solid fa-sliders text-bisu-blue mr-2"></i> Form Settings</h3>
+                </div>
+                
+                <div class="flex-grow overflow-y-auto space-y-6 pr-2 custom-scrollbar">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">Offices Available (One per line)</label>
+                        <textarea id="config-offices" rows="3" class="w-full max-w-2xl border border-slate-300 rounded-xl p-3 focus:ring-bisu-blue shadow-sm bg-slate-50"></textarea>
+                    </div>
+                    <div class="pt-3 border-t">
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Rating Questions Configuration</label>
+                        <p class="text-xs text-slate-500 mb-4">Manage the questions asked to the user below.</p>
+                        
+                        <div id="config-dimensions-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-4">
+                            <!-- Rendered dynamically -->
+                        </div>
+                        
+                        <button type="button" id="add-dimension-btn" class="w-full bg-slate-50 hover:bg-green-50 text-slate-600 hover:text-green-600 border-2 border-dashed border-slate-300 hover:border-green-400 font-bold py-4 rounded-xl transition flex items-center justify-center">
+                            <i class="fa-solid fa-circle-plus text-xl mr-2"></i> Add New Question
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="mt-4 pt-4 border-t flex justify-end space-x-3">
+                    <button type="button" id="close-settings-btn" class="px-5 py-2.5 text-slate-600 font-bold hover:bg-slate-100 rounded-xl transition">Cancel</button>
+                    <button type="button" id="save-settings-btn" class="px-5 py-2.5 bg-bisu-blue text-white font-bold rounded-xl hover:bg-blue-800 transition shadow-md"><i class="fa-solid fa-floppy-disk mr-2"></i> Save Changes</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Manage Accounts Modal -->
+        <div id="manage-accounts-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] hidden items-center justify-center p-4 transition-opacity print:hidden">
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col p-6 md:p-8 animate-pop-in">
+                <div class="flex items-center justify-between border-b pb-3 mb-4">
+                    <h3 class="text-xl font-bold text-slate-800"><i class="fa-solid fa-users-gear text-bisu-blue mr-2"></i> Manage Office Accounts</h3>
+                    <button type="button" id="close-accounts-btn" class="text-slate-400 hover:text-slate-600 transition"><i class="fa-solid fa-xmark text-xl"></i></button>
+                </div>
+                
+                <div class="flex-grow space-y-6 overflow-y-auto custom-scrollbar max-h-[70vh] pr-2">
+                    <!-- Create Account Form -->
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm">
+                        <h4 class="font-bold text-slate-800 mb-3 border-b pb-2"><i class="fa-solid fa-user-plus text-bisu-gold mr-1"></i> Add / Reset Office Login</h4>
+                        <form id="office-account-form" class="space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 mb-1">Target Office</label>
+                                    <select id="acc-office" required class="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-bisu-blue shadow-sm bg-white text-sm">
+                                        <option value="" disabled selected>Select Office</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 mb-1">Email <span class="text-xs text-slate-400 font-normal">(Login ID)</span></label>
+                                    <input type="email" id="acc-email" required class="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-bisu-blue shadow-sm bg-white text-sm" placeholder="office@bisu.edu.ph">
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 mb-1">Password</label>
+                                    <input type="password" id="acc-password" required minlength="6" class="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-bisu-blue shadow-sm bg-white text-sm" placeholder="Minimum 6 characters">
+                                </div>
+                                <div class="flex items-end">
+                                    <button type="submit" id="submit-acc-btn" class="w-full h-[42px] bg-bisu-blue text-white font-bold rounded-lg hover:bg-blue-800 transition shadow-md flex items-center justify-center">
+                                        Save Credentials
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- List of Accounts -->
+                    <div>
+                        <h4 class="font-bold text-slate-800 mb-3"><i class="fa-solid fa-list-check text-slate-500 mr-1"></i> Authorized Roles</h4>
+                        <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                            <table class="w-full text-sm text-left text-slate-600">
+                                <thead class="text-xs text-slate-700 uppercase bg-slate-100 border-b border-slate-200">
+                                    <tr>
+                                        <th class="px-4 py-3">Assigned Office</th>
+                                        <th class="px-4 py-3">Email Address</th>
+                                        <th class="px-4 py-3 text-right">Delete</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="accounts-table-body">
+                                    <tr><td colspan="3" class="px-4 py-6 text-center text-slate-400 italic">No office accounts registered.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin Complaints Modal -->
+        <div id="admin-complaints-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[105] hidden items-center justify-center p-4 transition-opacity print:hidden">
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col p-6 animate-pop-in">
+                <div class="flex items-center justify-between border-b pb-4 mb-4">
+                    <h3 class="text-xl font-bold text-slate-800"><i class="fa-solid fa-triangle-exclamation text-red-500 mr-2"></i> Filed Complaints & Grievances</h3>
+                    <button type="button" id="close-complaints-btn" class="text-slate-400 hover:text-slate-600 transition"><i class="fa-solid fa-xmark text-xl"></i></button>
+                </div>
+                <div class="flex-grow overflow-y-auto custom-scrollbar">
+                    <div id="complaints-list-container" class="space-y-4 pr-2">
+                        <!-- Instantiated dynamically -->
+                        <div class="text-center py-10 text-slate-400 italic">Loading complaints...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Privacy Consent Modal (Overlay) -->
         <div id="privacy-modal" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900 bg-opacity-50 backdrop-blur-sm transition-opacity">
             <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 m-4 animate-pop-in">
@@ -94,7 +227,7 @@
         <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2"></div>
 
         <!-- VIEW: Feedback Form -->
-        <section id="view-feedback" class="space-y-6 section-hidden animate-slide-up">
+        <section id="view-feedback" class="space-y-6 section-hidden animate-slide-up max-w-4xl mx-auto w-full">
             <div class="glass p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200">
                 <div class="flex flex-col md:flex-row justify-between md:items-center mb-6 border-b pb-4">
                     <h2 class="text-2xl font-bold text-bisu-blue"><i class="fa-solid fa-clipboard-list mr-2"></i> <span id="t-fb-title">Feedback Form</span></h2>
@@ -174,9 +307,9 @@
 
                         <!-- CC2 & CC3 -->
                         <div id="cc-details-container" class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-blue-100">
-                             <div class="space-y-3">
-                                <label class="block text-sm font-bold text-slate-700" id="t-cc2-label">CC2. Would you say that the CC of this office was...? <span class="text-red-500">*</span></label>
-                                <select id="cc2" required class="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm focus:ring-bisu-blue transition-all">
+                             <div class="flex flex-col space-y-3">
+                                <label class="block text-sm font-bold text-slate-700 md:min-h-[40px]" id="t-cc2-label">CC2. Would you say that the CC of this office was...? <span class="text-red-500">*</span></label>
+                                <select id="cc2" required class="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm focus:ring-bisu-blue transition-all mt-auto">
                                     <option value="" disabled selected id="t-cc2-sel">Select Response</option>
                                     <option value="1" id="t-cc2-opt1">1. Easy to see</option>
                                     <option value="2" id="t-cc2-opt2">2. Somewhat easy to see</option>
@@ -185,9 +318,9 @@
                                     <option value="5" id="t-cc2-opt5">5. N/A</option>
                                 </select>
                             </div>
-                            <div class="space-y-3">
-                                <label class="block text-sm font-bold text-slate-700" id="t-cc3-label">CC3. How much did the CC help you in your transaction? <span class="text-red-500">*</span></label>
-                                <select id="cc3" required class="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm focus:ring-bisu-blue transition-all">
+                            <div class="flex flex-col space-y-3">
+                                <label class="block text-sm font-bold text-slate-700 md:min-h-[40px]" id="t-cc3-label">CC3. How much did the CC help you in your transaction? <span class="text-red-500">*</span></label>
+                                <select id="cc3" required class="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm focus:ring-bisu-blue transition-all mt-auto">
                                     <option value="" disabled selected id="t-cc3-sel">Select Response</option>
                                     <option value="1" id="t-cc3-opt1">Helped very much</option>
                                     <option value="2" id="t-cc3-opt2">Somewhat helped</option>
@@ -239,7 +372,7 @@
         </section>
 
         <!-- VIEW: Complaint Form -->
-        <section id="view-complaint" class="space-y-6 section-hidden animate-slide-up">
+        <section id="view-complaint" class="space-y-6 section-hidden animate-slide-up max-w-4xl mx-auto w-full">
             <div class="glass border-t-4 border-bisu-red p-6 md:p-8 rounded-2xl shadow-sm">
                 <div class="flex justify-between items-center mb-6 pb-4 border-b border-red-100">
                     <h2 class="text-2xl font-bold text-bisu-red"><i class="fa-solid fa-file-signature mr-2"></i> <span id="t-cp-title">Formal Complaint Form</span></h2>
@@ -311,8 +444,33 @@
         </section>
 
         <!-- VIEW: Admin Dashboard -->
-        <section id="view-admin" class="section-hidden animate-slide-up w-full max-w-7xl mx-auto -mx-4 sm:mx-0">
-            <div class="glass p-6 rounded-2xl shadow-sm border border-slate-200 print:bg-white print:border-none print:shadow-none print:p-0">
+        <section id="view-admin" class="section-hidden animate-slide-up w-full max-w-[98%] 2xl:max-w-[95%] mx-auto flex flex-col xl:flex-row gap-6 items-start">
+            
+            <!-- Sidebar Navigation -->
+            <aside class="w-full xl:w-72 glass rounded-2xl p-6 flex flex-col shrink-0 border border-slate-200 print:hidden shadow-sm xl:sticky xl:top-24 z-40 bg-white/70 backdrop-blur-xl">
+                <div class="flex items-center mb-10 border-b border-slate-200 pb-5">
+                    <div class="w-12 h-12 bg-bisu-blue rounded-xl text-white flex items-center justify-center text-xl shadow-lg mr-4 drop-shadow-md"><i class="fa-solid fa-chart-pie"></i></div>
+                    <div>
+                        <h2 class="text-xl font-black text-slate-800 leading-tight tracking-tight">Admin<br><span class="text-bisu-blue">Panel</span></h2>
+                    </div>
+                </div>
+                
+                <p class="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3 px-2">Management Tools</p>
+                <nav class="flex flex-col space-y-2 flex-grow mb-10">
+                    <button id="admin-settings-btn" class="flex items-center text-left w-full px-4 py-3.5 bg-transparent hover:bg-white text-slate-600 hover:text-bisu-blue rounded-xl font-bold transition-all group shadow-sm hover:shadow border border-transparent hover:border-slate-100"><i class="fa-solid fa-sliders w-7 text-center mr-2 text-slate-400 group-hover:text-bisu-blue transition-colors"></i> Form Settings</button>
+                    <button id="manage-accounts-btn" class="flex items-center text-left w-full px-4 py-3.5 bg-transparent hover:bg-white text-slate-600 hover:text-bisu-blue rounded-xl font-bold transition-all group shadow-sm hover:shadow border border-transparent hover:border-slate-100"><i class="fa-solid fa-users-gear w-7 text-center mr-2 text-slate-400 group-hover:text-bisu-blue transition-colors"></i> Office Accounts</button>
+                </nav>
+
+                <p class="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3 px-2">Reports & Exports</p>
+                <nav class="flex flex-col space-y-2 mb-10">
+                    <button onclick="printAll()" class="flex items-center text-left w-full px-4 py-3.5 bg-slate-800 hover:bg-black text-white rounded-xl font-bold transition shadow-md hover:shadow-lg transform hover:-translate-y-0.5"><i class="fa-solid fa-print w-7 text-center mr-2"></i> Print Dashboard</button>
+                </nav>
+                
+                <button id="logout-admin-btn" class="flex items-center justify-center text-left w-full px-4 py-3 mt-auto bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 border border-red-100 hover:border-red-200 rounded-xl font-bold transition"><i class="fa-solid fa-door-open mr-2"></i> Close Session</button>
+            </aside>
+
+            <!-- Main Dashboard Content -->
+            <div class="flex-grow glass p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 print:bg-white print:border-none print:shadow-none print:p-0 w-full min-w-0">
                 
                 <!-- Print Letterhead (Visible ONLY during print) -->
                 <div id="print-header" class="hidden print:flex flex-col items-center justify-center mb-8 pb-6 w-full pt-4">
@@ -340,47 +498,14 @@
                     </div>
                 </div>
 
-                <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-3 print:hidden">
-                    <h2 class="text-2xl font-bold text-slate-800"><i class="fa-solid fa-chart-pie mr-2 text-bisu-blue"></i> Admin Dashboard</h2>
-                    <div class="flex space-x-2">
-                        <button onclick="printAll()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-bold shadow-sm transition"><i class="fa-solid fa-print mr-1"></i> Print Dashboard</button>
-                        <button id="admin-settings-btn" class="px-4 py-2 bg-bisu-gold text-bisu-blue hover:bg-yellow-500 rounded-lg text-sm font-bold transition-colors shadow-sm"><i class="fa-solid fa-sliders mr-1"></i> Form Settings</button>
-                        <button id="logout-admin-btn" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg text-sm font-medium transition-colors"><i class="fa-solid fa-door-open mr-1"></i> Close</button>
+                <div class="hidden sm:flex sm:justify-between sm:items-center mb-8 pb-4 border-b border-slate-100 print:hidden">
+                    <div>
+                        <h2 class="text-2xl font-black text-slate-800 tracking-tight">System Analytics <span class="bg-blue-100 text-bisu-blue text-xs font-bold px-2 py-1 rounded ml-2 align-middle">LIVE</span></h2>
+                        <p class="text-sm text-slate-500 font-medium mt-1">Real-time satisfaction and performance metrics.</p>
                     </div>
                 </div>
 
-                <!-- Form Settings Modal -->
-                <div id="admin-settings-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] hidden items-center justify-center p-4 transition-opacity">
-                    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-[90vw] h-[90vh] flex flex-col p-6 md:p-8 animate-pop-in">
-                        <div class="flex items-center border-b pb-3 mb-4">
-                            <h3 class="text-xl font-bold text-slate-800"><i class="fa-solid fa-sliders text-bisu-blue mr-2"></i> Form Settings</h3>
-                        </div>
-                        
-                        <div class="flex-grow overflow-y-auto space-y-6 pr-2 custom-scrollbar">
-                            <div>
-                                <label class="block text-sm font-semibold text-slate-700 mb-1">Offices Available (One per line)</label>
-                                <textarea id="config-offices" rows="3" class="w-full max-w-2xl border border-slate-300 rounded-xl p-3 focus:ring-bisu-blue shadow-sm bg-slate-50"></textarea>
-                            </div>
-                            <div class="pt-3 border-t">
-                                <label class="block text-sm font-semibold text-slate-700 mb-2">Rating Questions Configuration</label>
-                                <p class="text-xs text-slate-500 mb-4">Manage the questions asked to the user below.</p>
-                                
-                                <div id="config-dimensions-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-4">
-                                    <!-- Rendered dynamically -->
-                                </div>
-                                
-                                <button type="button" id="add-dimension-btn" class="w-full bg-slate-50 hover:bg-green-50 text-slate-600 hover:text-green-600 border-2 border-dashed border-slate-300 hover:border-green-400 font-bold py-4 rounded-xl transition flex items-center justify-center">
-                                    <i class="fa-solid fa-circle-plus text-xl mr-2"></i> Add New Question
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div class="mt-4 pt-4 border-t flex justify-end space-x-3">
-                            <button type="button" id="close-settings-btn" class="px-5 py-2.5 text-slate-600 font-bold hover:bg-slate-100 rounded-xl transition">Cancel</button>
-                            <button type="button" id="save-settings-btn" class="px-5 py-2.5 bg-bisu-blue text-white font-bold rounded-xl hover:bg-blue-800 transition shadow-md"><i class="fa-solid fa-floppy-disk mr-2"></i> Save Changes</button>
-                        </div>
-                    </div>
-                </div>
+
 
                 <!-- Stats Overview -->
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
@@ -392,9 +517,16 @@
                         <div class="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-xl mr-4"><i class="fa-solid fa-star"></i></div>
                         <div><p class="text-sm text-slate-500 font-medium">Avg Satisfaction</p><p id="stat-avg" class="text-2xl font-bold text-slate-800">0.0</p></div>
                     </div>
-                    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center">
-                        <div class="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-xl mr-4"><i class="fa-solid fa-triangle-exclamation"></i></div>
-                        <div><p class="text-sm text-slate-500 font-medium">Complaints</p><p id="stat-complaints" class="text-2xl font-bold text-slate-800">0</p></div>
+                    <div id="view-complaints-btn" class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center cursor-pointer hover:border-red-300 hover:shadow-md transition group relative overflow-hidden print:border-slate-100 print:shadow-none print:transform-none">
+                        <div class="absolute right-0 top-0 w-16 h-16 bg-red-50 rounded-full transform translate-x-8 -translate-y-8 group-hover:scale-150 transition-transform duration-500 ease-out z-0"></div>
+                        <div class="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-xl mr-4 z-10 transition-transform duration-300 group-hover:scale-110"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                        <div class="z-10 flex-grow">
+                            <p class="text-sm text-slate-500 font-bold group-hover:text-red-500 transition-colors">View Complaints</p>
+                            <div class="flex items-center justify-between w-full">
+                                <p id="stat-complaints" class="text-2xl font-bold text-slate-800 group-hover:text-red-700 transition-colors">0</p>
+                                <i class="fa-solid fa-arrow-right text-red-400 opacity-0 group-hover:opacity-100 transition-opacity -translate-x-4 group-hover:translate-x-0 transform duration-300 print:hidden"></i>
+                            </div>
+                        </div>
                     </div>
                     <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 border-dashed flex flex-col justify-center items-center text-center p-6 bg-slate-50/50">
                          <button id="refresh-data-btn" class="w-full py-2 bg-bisu-blue text-white rounded-lg hover:bg-blue-800 transition text-sm font-medium shadow-sm">
@@ -437,11 +569,17 @@
 
                 <!-- Citizen's Charter Summary Result Section -->
                 <div id="section-table-a" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8">
-                    <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+                    <div class="bg-white px-6 py-4 border-b border-slate-200 flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
                         <div class="flex items-center space-x-3">
-                            <h3 class="font-bold text-lg text-bisu-blue">A. Citizen's Charter Summary Result</h3>
-                            <button onclick="printSpecificTable('table-a')" class="text-slate-500 hover:text-bisu-blue transition-colors print:hidden" title="Print Table A"><i class="fa-solid fa-print"></i></button>
-                            <button onclick="sendReportToService('Table A')" class="text-slate-500 hover:text-bisu-gold transition-colors print:hidden" title="Send Table A"><i class="fa-solid fa-paper-plane text-sm"></i></button>
+                            <div class="w-10 h-10 bg-blue-50 text-bisu-blue rounded-xl flex items-center justify-center text-lg font-bold shrink-0 print:hidden"><i class="fa-solid fa-ranking-star"></i></div>
+                            <div>
+                                <h3 class="font-bold text-[17px] text-slate-800 tracking-tight">A. Citizen's Charter Summary Result</h3>
+                                <p class="text-[11px] text-slate-500 font-bold tracking-wide uppercase mt-0.5">Table Overview & Analytics</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2 w-full md:w-auto justify-end">
+                            <button onclick="printSpecificTable('table-a')" class="px-3 py-1.5 bg-white border border-slate-300 hover:border-slate-400 text-slate-600 hover:text-slate-800 rounded-lg text-xs font-bold transition shadow-sm flex items-center print:hidden"><i class="fa-solid fa-print mr-1.5 text-slate-400"></i> Print</button>
+                            <button onclick="sendReportToService('Table A')" class="px-3 py-1.5 bg-bisu-blue text-white hover:bg-blue-800 rounded-lg text-xs font-bold transition shadow-sm flex items-center print:hidden"><i class="fa-solid fa-paper-plane mr-1.5 text-[10px]"></i> Forward</button>
                         </div>
                     </div>
                     <div class="p-4 overflow-x-auto custom-scrollbar">
@@ -494,14 +632,22 @@
 
                 <!-- Monthly Report Card Section -->
                 <div id="section-table-b" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8">
-                    <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-end pb-3">
-                        <div class="flex items-center space-x-3">
-                            <h3 class="font-bold text-lg text-bisu-blue">B. CSF Monthly Rating</h3>
-                            <button onclick="printSpecificTable('table-b')" class="text-slate-500 hover:text-bisu-blue transition-colors print:hidden" title="Print Table B"><i class="fa-solid fa-print"></i></button>
-                            <button onclick="sendReportToService('Table B')" class="text-slate-500 hover:text-bisu-gold transition-colors print:hidden" title="Send Table B"><i class="fa-solid fa-paper-plane text-sm"></i></button>
+                    <div class="bg-white px-6 py-4 border-b border-slate-200 flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
+                        <div class="flex items-center space-x-3 shrink-0">
+                            <div class="w-10 h-10 bg-yellow-50 text-bisu-gold shadow-[inset_0_0_0_1px_rgba(234,179,8,0.2)] rounded-xl flex items-center justify-center text-lg font-bold shrink-0 print:hidden"><i class="fa-solid fa-star"></i></div>
+                            <div>
+                                <h3 class="font-bold text-[17px] text-slate-800 tracking-tight">B. CSF Monthly Rating</h3>
+                                <p class="text-[11px] text-slate-500 font-bold tracking-wide uppercase mt-0.5">Service Assessment Metrics</p>
+                            </div>
                         </div>
-                        <div class="text-sm font-semibold text-slate-700 flex items-end">
-                            <span class="mr-2">Campus:</span> <span id="csf-campus" class="border-b-2 border-slate-900 inline-block w-48 px-2 text-center text-bisu-blue font-bold">CALAPE</span>
+                        <div class="flex flex-wrap items-center gap-3 w-full md:w-auto justify-between md:justify-end">
+                            <div class="text-[12px] font-semibold text-slate-600 bg-slate-50 border border-slate-200 shadow-inner px-3 py-1.5 rounded-lg flex items-center mr-0 md:mr-2">
+                                <span class="text-slate-400 mr-2 uppercase text-[10px] tracking-wider">Campus:</span> <span id="csf-campus" class="text-bisu-blue font-black tracking-wide">CALAPE</span>
+                            </div>
+                            <div class="flex items-center space-x-2 shrink-0">
+                                <button onclick="printSpecificTable('table-b')" class="px-3 py-1.5 bg-white border border-slate-300 hover:border-slate-400 text-slate-600 hover:text-slate-800 rounded-lg text-xs font-bold transition shadow-sm flex items-center print:hidden"><i class="fa-solid fa-print mr-1.5 text-slate-400"></i> Print</button>
+                                <button onclick="sendReportToService('Table B')" class="px-3 py-1.5 bg-bisu-gold text-yellow-900 hover:bg-yellow-500 rounded-lg text-xs font-bold transition shadow-sm flex items-center print:hidden"><i class="fa-solid fa-paper-plane mr-1.5 text-[10px]"></i> Forward</button>
+                            </div>
                         </div>
                     </div>
                     <div class="p-4 overflow-x-auto custom-scrollbar">
@@ -533,11 +679,17 @@
 
         <!-- CSF Monthly Commendations & Suggestions Section -->
                 <div id="section-table-c" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8">
-                    <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center flex-wrap gap-4">
-                        <div class="flex items-center space-x-3">
-                            <h3 class="font-bold text-lg text-bisu-blue">C. CSF Monthly Commendations and Suggestions</h3>
-                            <button onclick="printSpecificTable('table-c')" class="text-slate-500 hover:text-bisu-blue transition-colors print:hidden" title="Print Table C"><i class="fa-solid fa-print"></i></button>
-                            <button onclick="sendReportToService('Table C')" class="text-slate-500 hover:text-bisu-gold transition-colors print:hidden" title="Send Table C"><i class="fa-solid fa-paper-plane text-sm"></i></button>
+                    <div class="bg-white px-6 py-4 border-b border-slate-200 flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
+                        <div class="flex items-center space-x-3 shrink-0">
+                            <div class="w-10 h-10 bg-green-50 text-green-600 rounded-xl flex items-center justify-center text-lg font-bold shrink-0 print:hidden"><i class="fa-solid fa-comments"></i></div>
+                            <div>
+                                <h3 class="font-bold text-[17px] text-slate-800 tracking-tight">C. CSF Commendations and Suggestions</h3>
+                                <p class="text-[11px] text-slate-500 font-bold tracking-wide uppercase mt-0.5">Contextual Feedback Records</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2 w-full md:w-auto justify-end">
+                            <button onclick="printSpecificTable('table-c')" class="px-3 py-1.5 bg-white border border-slate-300 hover:border-slate-400 text-slate-600 hover:text-slate-800 rounded-lg text-xs font-bold transition shadow-sm flex items-center print:hidden"><i class="fa-solid fa-print mr-1.5 text-slate-400"></i> Print</button>
+                            <button onclick="sendReportToService('Table C')" class="px-3 py-1.5 bg-bisu-blue text-white hover:bg-blue-800 rounded-lg text-xs font-bold transition shadow-sm flex items-center print:hidden"><i class="fa-solid fa-paper-plane mr-1.5 text-[10px]"></i> Forward</button>
                         </div>
                     </div>
                     <div class="p-4 overflow-x-auto custom-scrollbar">
@@ -566,7 +718,7 @@
                 </div>
 
                 <!-- Submissions Tracking (For Offices to Check) -->
-                <div id="section-log" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div id="section-log" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden print:hidden">
                     <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
                         <h3 class="font-bold text-lg text-slate-800">Recent Submissions (Verification Log)</h3>
                     </div>

@@ -22,8 +22,32 @@ body {
     body[class*="print-"] #view-admin, 
     body[class*="print-"] #view-admin * { visibility: visible; }
     
+    @page {
+        size: landscape;
+        margin: 10mm;
+    }
+    
     body[class*="print-"] #view-admin { 
-        position: absolute; left: 0; top: 0; width: 100%; border: none !important; box-shadow: none !important; margin: 0; padding: 0;
+        position: absolute; left: 0; top: 0; width: 100% !important; max-width: none !important; border: none !important; box-shadow: none !important; margin: 0; padding: 0;
+    }
+
+    /* Fix table cut-offs during print */
+    body[class*="print-"] .overflow-x-auto,
+    body[class*="print-"] .overflow-hidden {
+        overflow: visible !important;
+    }
+    
+    body[class*="print-"] table {
+        width: 100% !important;
+        max-width: 100% !important;
+        white-space: normal !important;
+    }
+    
+    body[class*="print-"] table th,
+    body[class*="print-"] table td {
+        padding: 4px 2px !important;
+        font-size: 8pt !important;
+        word-break: break-word !important;
     }
     
     /* Global hides in admin view during print */
