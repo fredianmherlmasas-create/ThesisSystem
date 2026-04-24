@@ -26,14 +26,79 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => document.body.className = 'text-slate-800 antialiased min-h-screen flex flex-col relative overflow-x-hidden', 550);
     };
 
-    window.sendReportToService = function(reportType) {
-        const confirmSend = confirm(`Are you sure you want to send the "${reportType}" to the Campus Quality Assurance Service?`);
-        if(confirmSend) {
-            showToast(`Submitting ${reportType}...`, 'info');
-            setTimeout(() => {
-                showToast(`${reportType} successfully sent to the Office of Quality Assurance.`, 'success');
-            }, 1500);
+    window.sendReportToService = async function(reportType) {
+        const client = await getSupabaseClient();
+        if (!client) {
+            showToast('Unable to connect to database.', 'error');
+            return;
         }
+
+        const { data: accounts } = await client.from('office_accounts')
+                                               .select('office_name, email')
+                                               .order('office_name', { ascending: true });
+        
+        let inputOptions = {};
+
+        if (typeof formConfig !== 'undefined' && Array.isArray(formConfig.recipients)) {
+            formConfig.recipients.forEach(r => {
+                const parts = r.split('|');
+                if (parts.length >= 2) {
+                    inputOptions[parts[1].trim()] = `${parts[0].trim()} (${parts[1].trim()})`;
+                } else if (r.trim() !== '') {
+                    inputOptions[r.trim()] = r.trim();
+                }
+            });
+        }
+
+        if (Object.keys(inputOptions).length === 0) {
+            inputOptions["qa@bisu.edu.ph"] = "Campus Quality Assurance Service (qa@bisu.edu.ph)";
+        }
+
+        if (accounts && accounts.length > 0) {
+            accounts.forEach(acc => {
+                inputOptions[acc.email] = `${acc.office_name} (${acc.email})`;
+            });
+        }
+
+        Swal.fire({
+            title: `Send ${reportType}?`,
+            html: `Select the destination to send the <b>"${reportType}"</b>:`,
+            iconHtml: '<div class="w-16 h-16 bg-blue-50 text-bisu-blue rounded-full flex items-center justify-center mx-auto mb-2 shadow-sm border border-blue-100"><i class="fa-solid fa-paper-plane text-2xl"></i></div>',
+            customClass: {
+                icon: 'border-0 mb-0 w-full',
+                popup: 'rounded-3xl shadow-2xl font-sans pb-4 border border-slate-100',
+                title: 'text-2xl font-black text-slate-800 tracking-tight mt-2',
+                htmlContainer: 'text-slate-500 font-medium mt-2 mb-6 text-sm',
+                input: 'w-[90%] mx-auto bg-slate-50 border border-slate-300 text-slate-700 text-sm rounded-xl focus:ring-0 focus:border-bisu-blue block p-3.5 shadow-sm transition-colors outline-none cursor-pointer',
+                actions: 'w-full flex justify-center gap-3 mt-6',
+                confirmButton: 'bg-bisu-blue hover:bg-blue-900 text-white font-bold rounded-xl px-8 py-3.5 shadow-md transition-all w-full max-w-[160px] flex items-center justify-center gap-2',
+                cancelButton: 'bg-white hover:bg-slate-50 text-slate-600 font-bold rounded-xl px-8 py-3.5 transition-all border border-slate-200 w-full max-w-[150px] shadow-sm',
+            },
+            buttonsStyling: false,
+            input: 'select',
+            inputOptions: inputOptions,
+            inputPlaceholder: 'Select recipient...',
+            showCancelButton: true,
+            confirmButtonText: '<i class="fa-solid fa-paper-plane"></i> Send',
+            cancelButtonText: 'Cancel',
+            inputValidator: (value) => {
+                return new Promise((resolve) => {
+                    if (value !== '') {
+                        resolve();
+                    } else {
+                        resolve('You need to select a destination.');
+                    }
+                });
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                const selectedDestination = result.value === 'QA' ? 'Campus Quality Assurance Service' : result.value;
+                showToast(`Submitting ${reportType} to ${selectedDestination}...`, 'info');
+                setTimeout(() => {
+                    showToast(`${reportType} successfully sent to ${selectedDestination}.`, 'success');
+                }, 1500);
+            }
+        });
     };
 
     // Views
@@ -61,6 +126,63 @@ document.addEventListener('DOMContentLoaded', () => {
     const submitAccBtn = document.getElementById('submit-acc-btn');
     const accountsTableBody = document.getElementById('accounts-table-body');
     const settingsBtn = document.getElementById('admin-settings-btn');
+
+    // Manage Recipients Modal
+    const manageRecipientsBtn = document.getElementById('manage-recipients-btn');
+    const manageRecipientsModal = document.getElementById('manage-recipients-modal');
+    const closeRecipientsBtn = document.getElementById('close-recipients-btn');
+    const saveRecipientsBtn = document.getElementById('save-recipients-btn');
+    const configRecipientsList = document.getElementById('config-recipients-list');
+    const addRecipientBtn = document.getElementById('add-recipient-btn');
+    
+    let tempRecipients = [];
+    
+    function renderRecipientsList() {
+        if (!configRecipientsList) return;
+        configRecipientsList.innerHTML = '';
+        tempRecipients.forEach((recip, idx) => {
+            const div = document.createElement('div');
+            div.className = 'bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-sm relative';
+            div.innerHTML = `
+                <button type="button" class="absolute top-4 right-4 text-slate-400 hover:text-red-500 transition" onclick="removeTempRecipient(${idx})" title="Remove"><i class="fa-solid fa-trash"></i></button>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mr-6">
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Office / Title</label>
+                        <input type="text" value="${recip.name}" onchange="updateTempRecipient(${idx}, 'name', this.value)" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:border-bisu-blue focus:ring-1 focus:ring-bisu-blue outline-none transition-shadow bg-white" placeholder="e.g. Quality Assurance">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Email Address</label>
+                        <input type="email" value="${recip.email}" onchange="updateTempRecipient(${idx}, 'email', this.value)" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:border-bisu-blue focus:ring-1 focus:ring-bisu-blue outline-none transition-shadow bg-white" placeholder="e.g. qa@bisu.edu.ph">
+                    </div>
+                </div>
+            `;
+            configRecipientsList.appendChild(div);
+        });
+        
+        if (tempRecipients.length === 0) {
+            configRecipientsList.innerHTML = '<div class="text-center py-6 text-slate-400 italic text-sm">No custom recipients added.</div>';
+        }
+    }
+
+    if (addRecipientBtn) {
+        addRecipientBtn.addEventListener('click', () => {
+            tempRecipients.push({ name: '', email: '' });
+            renderRecipientsList();
+            setTimeout(() => {
+                const list = configRecipientsList;
+                if(list) list.scrollTop = list.scrollHeight;
+            }, 50);
+        });
+    }
+
+    window.updateTempRecipient = function(idx, field, val) {
+        tempRecipients[idx][field] = val;
+    };
+
+    window.removeTempRecipient = function(idx) {
+        tempRecipients.splice(idx, 1);
+        renderRecipientsList();
+    };
 
     // Consent
     const consentCheckbox = document.getElementById('consent-checkbox');
@@ -263,6 +385,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // === Dynamic Form Config ===
     const getDefaultFormConfig = () => ({
         offices: ["Registrar's Office", "Cashier", "Library", "Clinic", "Guidance Office"],
+        recipients: ["Campus Quality Assurance Service | qa@bisu.edu.ph"],
         dimensions: JSON.parse(JSON.stringify(defaultDimensions))
     });
 
@@ -270,6 +393,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const normalized = config || {};
         if (!Array.isArray(normalized.offices) || normalized.offices.length === 0) {
             normalized.offices = getDefaultFormConfig().offices;
+        }
+
+        if (!Array.isArray(normalized.recipients) || normalized.recipients.length === 0) {
+            normalized.recipients = getDefaultFormConfig().recipients;
         }
 
         if (!normalized.dimensions || typeof normalized.dimensions !== 'object') {
@@ -498,8 +625,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const langSelector = document.getElementById('language-selector');
+    const langSelectorMobile = document.getElementById('language-selector-mobile');
+    
     if(langSelector) {
-        langSelector.addEventListener('change', (e) => applyTranslations(e.target.value));
+        langSelector.addEventListener('change', (e) => {
+            applyTranslations(e.target.value);
+            if(langSelectorMobile) langSelectorMobile.value = e.target.value;
+        });
+    }
+    if(langSelectorMobile) {
+        langSelectorMobile.addEventListener('change', (e) => {
+            applyTranslations(e.target.value);
+            if(langSelector) langSelector.value = e.target.value;
+        });
     }
 
     // === Event Listeners ===
@@ -558,12 +696,20 @@ document.addEventListener('DOMContentLoaded', () => {
         return !!adminData;
     }
 
-    adminLoginBtn.addEventListener('click', () => {
+    function openAdminLoginModal() {
         adminLoginModal.classList.remove('hidden');
         adminLoginModal.classList.add('flex');
         document.body.style.overflow = 'hidden';
         setTimeout(() => loginEmailInput.focus(), 100);
-    });
+    }
+
+    adminLoginBtn.addEventListener('click', openAdminLoginModal);
+
+    // Mobile admin login button
+    const adminLoginBtnMobile = document.getElementById('admin-login-btn-mobile');
+    if(adminLoginBtnMobile) {
+        adminLoginBtnMobile.addEventListener('click', openAdminLoginModal);
+    }
 
     closeLoginBtn.addEventListener('click', () => {
         adminLoginModal.classList.add('hidden');
@@ -750,7 +896,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     window.deleteOfficeAccount = async function(id) {
-        if(!confirm('Delete this office account? They will lose access to the dashboard immediately.')) return;
+        const result = await Swal.fire({
+            title: 'Delete Account?',
+            html: 'They will lose access to the dashboard immediately.<br><b>This action cannot be undone.</b>',
+            iconHtml: '<div class="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-2 shadow-sm border border-red-100"><i class="fa-solid fa-triangle-exclamation text-2xl"></i></div>',
+            customClass: {
+                icon: 'border-0 mb-0 w-full',
+                popup: 'rounded-3xl shadow-2xl font-sans pb-4 border border-slate-100',
+                title: 'text-2xl font-black text-slate-800 tracking-tight mt-2',
+                htmlContainer: 'text-slate-500 font-medium mt-2 mb-6 text-sm',
+                actions: 'w-full flex justify-center gap-3 mt-6',
+                confirmButton: 'bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl px-8 py-3.5 shadow-md transition-all w-full max-w-[160px] flex items-center justify-center gap-2',
+                cancelButton: 'bg-white hover:bg-slate-50 text-slate-600 font-bold rounded-xl px-8 py-3.5 transition-all border border-slate-200 w-full max-w-[150px] shadow-sm',
+            },
+            buttonsStyling: false,
+            showCancelButton: true,
+            confirmButtonText: '<i class="fa-solid fa-trash"></i> Delete',
+            cancelButtonText: 'Keep Account'
+        });
+        
+        if(!result.isConfirmed) return;
         
         const client = await getSupabaseClient();
         if(!client) return;
@@ -763,6 +928,8 @@ document.addEventListener('DOMContentLoaded', () => {
             fetchOfficeAccounts();
         }
     };
+
+
 
     document.getElementById('refresh-data-btn').addEventListener('click', fetchAdminData);
 
@@ -945,22 +1112,37 @@ document.addEventListener('DOMContentLoaded', () => {
         const container = document.getElementById('toast-container');
         const toast = document.createElement('div');
         
-        let bgClass = "bg-slate-800 text-white";
-        if (type === 'success') bgClass = "bg-green-600 text-white";
-        if (type === 'error') bgClass = "bg-red-600 text-white";
-        if (type === 'warning') bgClass = "bg-yellow-500 text-white";
+        const config = {
+            success: { bg: 'bg-emerald-600/95', icon: 'fa-circle-check',  label: 'Success' },
+            error:   { bg: 'bg-red-600/95',     icon: 'fa-circle-xmark',  label: 'Error' },
+            warning: { bg: 'bg-amber-500/95',    icon: 'fa-triangle-exclamation', label: 'Warning' },
+            info:    { bg: 'bg-slate-800/95',    icon: 'fa-circle-info',   label: 'Info' }
+        };
 
-        toast.className = `px-4 py-3 rounded-lg shadow-lg flex items-center font-medium animate-pop-in ${bgClass}`;
+        const c = config[type] || config.info;
+
+        toast.className = `px-4 py-3.5 rounded-xl shadow-2xl flex items-center gap-3 font-medium text-white text-sm max-w-sm toast-enter ${c.bg}`;
+        toast.style.backdropFilter = 'blur(12px)';
         toast.innerHTML = `
-            <span>${message}</span>
+            <div class="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
+                <i class="fa-solid ${c.icon} text-base"></i>
+            </div>
+            <div class="flex-grow min-w-0">
+                <div class="text-[10px] font-bold uppercase tracking-wider opacity-70 mb-0.5">${c.label}</div>
+                <div class="text-sm leading-snug">${message}</div>
+            </div>
+            <button onclick="this.parentElement.classList.replace('toast-enter','toast-leave');setTimeout(()=>this.parentElement.remove(),300)" class="ml-2 shrink-0 opacity-60 hover:opacity-100 transition-opacity">
+                <i class="fa-solid fa-xmark text-xs"></i>
+            </button>
         `;
         container.appendChild(toast);
 
         setTimeout(() => {
-            toast.style.opacity = '0';
-            toast.style.transition = 'opacity 0.5s ease';
-            setTimeout(() => toast.remove(), 500);
-        }, 4000);
+            if (toast.parentElement) {
+                toast.classList.replace('toast-enter', 'toast-leave');
+                setTimeout(() => toast.remove(), 300);
+            }
+        }, 4500);
     }
 
     // Offline Storage Logic
@@ -1116,7 +1298,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const client = await getSupabaseClient();
                 if (client) {
-                    const { error } = await client.from(SETTINGS_TABLE).upsert({
+                    const { error } = await client.from('admin_settings').upsert({
                         id: 'global_config',
                         config: formConfig,
                         updated_at: new Date().toISOString()
@@ -1135,6 +1317,70 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (error) {
                 showToast('Error saving settings.', 'error');
                 console.error(error);
+            }
+        });
+    }
+
+    if(manageRecipientsBtn) {
+        manageRecipientsBtn.addEventListener('click', () => {
+            tempRecipients = (formConfig.recipients || []).map(r => {
+                const parts = r.split('|');
+                if (parts.length >= 2) return { name: parts[0].trim(), email: parts[1].trim() };
+                return { name: r.trim(), email: '' }; // Fallback
+            }).filter(r => r.name !== '' || r.email !== '');
+            
+            renderRecipientsList();
+            
+            if (manageRecipientsModal) {
+                manageRecipientsModal.classList.remove('hidden');
+                manageRecipientsModal.classList.add('flex');
+                document.body.style.overflow = 'hidden';
+            }
+        });
+    }
+
+    if(closeRecipientsBtn) {
+        closeRecipientsBtn.addEventListener('click', () => {
+            if (manageRecipientsModal) {
+                manageRecipientsModal.classList.add('hidden');
+                manageRecipientsModal.classList.remove('flex');
+                document.body.style.overflow = '';
+            }
+        });
+    }
+
+    if(saveRecipientsBtn) {
+        saveRecipientsBtn.addEventListener('click', async () => {
+            saveRecipientsBtn.disabled = true;
+            saveRecipientsBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Saving...';
+            
+            try {
+                const parsedRecips = tempRecipients
+                    .filter(r => r.name.trim() !== '' && r.email.trim() !== '')
+                    .map(r => `${r.name.trim()} | ${r.email.trim()}`);
+                
+                formConfig.recipients = parsedRecips;
+                formConfig = normalizeFormConfig(formConfig);
+                localStorage.setItem('bisuFormConfig', JSON.stringify(formConfig));
+                
+                const client = await getSupabaseClient();
+                if(client) {
+                    await client.from('admin_settings').upsert({
+                        id: 'global_config',
+                        config: formConfig,
+                        updated_at: new Date().toISOString()
+                    });
+                }
+                
+                showToast('Email Recipients Updated', 'success');
+                manageRecipientsModal.classList.add('hidden');
+                manageRecipientsModal.classList.remove('flex');
+                document.body.style.overflow = '';
+            } catch(e) {
+                showToast('Failed to save recipients: ' + e.message, 'error');
+            } finally {
+                saveRecipientsBtn.disabled = false;
+                saveRecipientsBtn.innerHTML = '<i class="fa-solid fa-floppy-disk mr-2"></i> Save Recipients';
             }
         });
     }
