@@ -134,8 +134,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveRecipientsBtn = document.getElementById('save-recipients-btn');
     const configRecipientsList = document.getElementById('config-recipients-list');
     const addRecipientBtn = document.getElementById('add-recipient-btn');
+    const exportPdfBtn = document.getElementById('export-pdf-btn');
+    const exportExcelBtn = document.getElementById('export-excel-btn');
+    const resetDataBtn = document.getElementById('reset-data-btn');
     
     let tempRecipients = [];
+    let lastFetchedFeedbacks = [];
+    let lastFetchedComplaints = [];
     
     function renderRecipientsList() {
         if (!configRecipientsList) return;
@@ -189,6 +194,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const acceptConsentBtn = document.getElementById('accept-consent-btn');
 
     const toggleComplaintBtn = document.getElementById('toggle-complaint-btn');
+    const submitFeedbackBtn = document.getElementById('submit-feedback-btn');
+    const clearFeedbackBtn = document.getElementById('clear-feedback-btn');
+    const clearComplaintBtn = document.getElementById('clear-complaint-btn');
     const backToFeedbackBtn = document.getElementById('back-to-feedback-btn');
     const adminLoginBtn = document.getElementById('admin-login-btn');
     const logoutAdminBtn = document.getElementById('logout-admin-btn');
@@ -1402,6 +1410,9 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        lastFetchedFeedbacks = fData;
+        lastFetchedComplaints = cData;
+
         document.getElementById('stat-total').textContent = fData.length;
         document.getElementById('stat-complaints').textContent = cData.length;
         
@@ -1433,6 +1444,58 @@ document.addEventListener('DOMContentLoaded', () => {
         renderLogTable(combinedLogs);
         renderComplaintsModalList(cData);
     }
+
+    // --- Global Delete Handlers ---
+    window.deleteRecord = async function(id, type = 'feedbacks') {
+        const result = await Swal.fire({
+            title: 'Delete this record?',
+            text: "This action cannot be undone.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            confirmButtonText: 'Yes, delete it',
+            customClass: { popup: 'rounded-2xl shadow-xl' }
+        });
+
+        if (result.isConfirmed) {
+            try {
+                const client = await getSupabaseClient();
+                const table = type === 'complaint' ? 'complaints' : 'feedbacks';
+                const { error } = await client.from(table).delete().eq('id', id);
+                if (error) throw error;
+                showToast('Record deleted.', 'success');
+                fetchAdminData(); 
+            } catch (err) {
+                console.error(err);
+                showToast('Failed to delete.', 'error');
+            }
+        }
+    };
+
+    window.deleteOfficeData = async function(officeName) {
+        const result = await Swal.fire({
+            title: `Wipe all ${officeName} data?`,
+            text: `This will permanently remove ALL feedbacks and ratings for the ${officeName}. This is non-reversible.`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            confirmButtonText: 'Yes, clear all',
+            customClass: { popup: 'rounded-2xl shadow-xl border-t-8 border-red-500' }
+        });
+
+        if (result.isConfirmed) {
+            try {
+                const client = await getSupabaseClient();
+                const { error } = await client.from('feedbacks').delete().eq('office_visited', officeName);
+                if (error) throw error;
+                showToast(`Cleared all data for ${officeName}.`, 'success');
+                fetchAdminData();
+            } catch (err) {
+                console.error(err);
+                showToast('Failed to clear office data.', 'error');
+            }
+        }
+    };
 
     function renderCCTable(data) {
         const tbody = document.getElementById('cc-table-body');
@@ -1489,6 +1552,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td class="px-2 py-3 border">${g.bus}</td>
                 <td class="px-2 py-3 border">${g.gov}</td>
                 ${ccTds}
+                <td class="px-2 py-3 border text-center print:hidden">
+                    <button onclick="deleteOfficeData('${office}')" class="text-red-400 hover:text-red-600 transition" title="Delete all records for this office"><i class="fa-solid fa-trash-can"></i></button>
+                </td>
             `;
             tbody.appendChild(tr);
         }
@@ -1507,6 +1573,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td class="px-2 py-3 border">${totals.bus}</td>
                     <td class="px-2 py-3 border">${totals.gov}</td>
                     ${ccFoot}
+                    <td class="px-2 py-3 border print:hidden"></td>
                 </tr>
             `;
         }
@@ -1602,6 +1669,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 ${dimsCols}
                 <td class="px-4 py-3 text-center border bg-blue-50 font-bold">${rowAvg}</td>
                 <td class="px-4 py-3 text-center border text-xs font-semibold uppercase">${getDesc(rowAvg)}</td>
+                <td class="px-4 py-3 border text-center print:hidden">
+                    <button onclick="deleteOfficeData('${office}')" class="text-red-400 hover:text-red-600 transition" title="Delete all records for this office"><i class="fa-solid fa-trash-can"></i></button>
+                </td>
             `;
             tbody.appendChild(tr);
         }
@@ -1622,6 +1692,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     ${dimsFootCols}
                     <td class="px-4 py-3 border bg-blue-50 text-center font-bold">${totalAvg}</td>
                     <td class="px-4 py-3 border text-xs font-semibold uppercase">${getDesc(totalAvg)}</td>
+                    <td class="px-4 py-3 border print:hidden"></td>
                 </tr>
             `;
         }
@@ -1652,6 +1723,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td class="px-4 py-3 border align-top bg-slate-50"></td>
                     <td class="px-4 py-3 border align-top bg-slate-50"></td>
                     <td class="px-4 py-3 border align-top bg-slate-50"></td>
+                    <td class="px-4 py-3 border align-top bg-slate-50 text-center print:hidden">
+                        <button onclick="deleteRecord('${row.id}')" class="text-red-400 hover:text-red-600 transition" title="Delete this feedback"><i class="fa-solid fa-trash-can"></i></button>
+                    </td>
                 `;
                 tbody.appendChild(tr);
             }
@@ -1697,6 +1771,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td class="px-4 py-3 text-center space-x-2">
                     <button class="text-blue-500 hover:text-blue-700 transition action-email-btn" data-json="${escapedJson}" title="Forward Feedback via Email"><i class="fa-solid fa-envelope"></i></button>
                     <button class="text-slate-500 hover:text-bisu-blue transition action-print-btn" data-json="${escapedJson}" title="Print Individual Feedback Document"><i class="fa-solid fa-print"></i></button>
+                    <button onclick="deleteRecord('${row.id}', '${row.type}')" class="text-red-400 hover:text-red-600 transition" title="Permanently Delete Submission"><i class="fa-solid fa-trash-can"></i></button>
                 </td>
             `;
             logTbody.appendChild(tr);
@@ -1840,6 +1915,257 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             `;
             container.appendChild(el);
+        });
+    }
+
+    // === Export Functions ===
+    function triggerDownload(dataUri, fileName) {
+        const a = document.createElement('a');
+        a.href = dataUri;
+        a.download = fileName;
+        document.body.appendChild(a);
+        setTimeout(() => {
+            a.click();
+            document.body.removeChild(a);
+        }, 150);
+    }
+
+    async function exportToPDF() {
+        if (!lastFetchedFeedbacks || lastFetchedFeedbacks.length === 0) {
+            showToast('No data available to export.', 'error');
+            return;
+        }
+
+        Swal.fire({
+            title: 'Generating Official Report',
+            html: 'Formatting institutional data and analytics...',
+            didOpen: () => Swal.showLoading(),
+            allowOutsideClick: false,
+            customClass: { popup: 'rounded-3xl shadow-2xl border-t-4 border-bisu-blue' }
+        });
+
+        try {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('l', 'mm', 'a4');
+
+            // Official Letterhead Branding
+            doc.setFont('serif', 'bold');
+            doc.setFontSize(16);
+            doc.setTextColor(0, 0, 0);
+            doc.text('BOHOL ISLAND STATE UNIVERSITY', 148, 15, { align: 'center' });
+            doc.setFont('serif', 'normal');
+            doc.setFontSize(12);
+            doc.text('Calape Campus, Calape, Bohol', 148, 20, { align: 'center' });
+            
+            doc.setDrawColor(22, 18, 117);
+            doc.setLineWidth(0.5);
+            doc.line(20, 25, 277, 25); // Header Line
+
+            doc.setFont('sans', 'bold');
+            doc.setFontSize(14);
+            doc.setTextColor(22, 18, 117);
+            doc.text('MONTHLY CUSTOMER SATISFACTION SUMMARY REPORT', 148, 35, { align: 'center' });
+            
+            doc.setFontSize(9);
+            doc.setTextColor(100);
+            doc.text(`Generated via BISU-CSFS Admin System on ${new Date().toLocaleString()}`, 148, 40, { align: 'center' });
+
+            const activeDimensions = formConfig.dimensions['en'];
+            const headers = ['OFFICE/UNIT', 'CUST (f)', ...activeDimensions.map(d => d.label.split('.').pop().trim().toUpperCase().slice(0,12)), 'MEAN', 'RATING'];
+
+            const officeStats = {};
+            lastFetchedFeedbacks.forEach(row => {
+                const off = row.office_visited || 'General Office';
+                if (!officeStats[off]) {
+                    officeStats[off] = { count: 0, mean: 0, dims: {} };
+                    activeDimensions.forEach(d => officeStats[off].dims[d.id] = 0);
+                }
+                officeStats[off].count++;
+                officeStats[off].mean += parseFloat(row.mean_score || 0);
+                const r = row.ratings || row || {};
+                activeDimensions.forEach(d => officeStats[off].dims[d.id] += parseInt(r[d.id] || 0));
+            });
+
+            const body = Object.keys(officeStats).map(o => {
+                const s = officeStats[o];
+                return [o, s.count, ...activeDimensions.map(d => (s.dims[d.id] / s.count).toFixed(2)), (s.mean / s.count).toFixed(2), getDesc(s.mean / s.count).toUpperCase()];
+            });
+
+            doc.autoTable({
+                startY: 45,
+                head: [headers],
+                body: body,
+                theme: 'grid',
+                headStyles: { fillColor: [22, 18, 117], textColor: [255, 255, 255], fontSize: 7, fontStyle: 'bold' },
+                styles: { fontSize: 8, cellPadding: 2, halign: 'center' },
+                columnStyles: { 0: { halign: 'left', fontStyle: 'bold' } }
+            });
+
+            // Sign-off section (Traditional for Defense Reports)
+            const finalY = doc.previousAutoTable.finalY + 20;
+            doc.setFontSize(10);
+            doc.setTextColor(0);
+            doc.text('Certified Correct:', 20, finalY);
+            doc.line(20, finalY + 10, 80, finalY + 10);
+            doc.text('Administrative Officer / Document Custodian', 20, finalY + 15);
+
+            const dataUri = doc.output('datauristring');
+            const dateStr = new Date().toISOString().split('T')[0];
+            
+            Swal.close();
+            setTimeout(() => {
+                triggerDownload(dataUri, `BISU_Summary_Report_${dateStr}.pdf`);
+                showToast('Official PDF Exported.', 'success');
+            }, 300);
+        } catch (err) {
+            console.error(err);
+            Swal.close();
+            showToast('Export failed.', 'error');
+        }
+    }
+
+    function exportToExcel() {
+        if (!lastFetchedFeedbacks || lastFetchedFeedbacks.length === 0) {
+            showToast('No data available to export.', 'error');
+            return;
+        }
+
+        Swal.fire({
+            title: 'Generating Spreadsheet',
+            didOpen: () => Swal.showLoading(),
+            allowOutsideClick: false,
+            customClass: { popup: 'rounded-3xl shadow-xl border-t-4 border-green-600' }
+        });
+
+        try {
+            const wb = XLSX.utils.book_new();
+            const data = lastFetchedFeedbacks.map(f => ({
+                'Submission Date': new Date(f.created_at).toLocaleString(),
+                'Target Office': f.office_visited || 'N/A',
+                'Service Availed': f.service_availed || 'N/A',
+                'Client Category': f.client_type || 'N/A',
+                'Satisfaction Score': f.mean_score || 0,
+                'Client Commendations': f.commendations || 'None',
+                'Suggestions/Complaints': f.suggestions || 'None'
+            }));
+            const ws = XLSX.utils.json_to_sheet(data);
+            
+            // Set column widths for better Excel presentation
+            ws['!cols'] = [{wch:25}, {wch:25}, {wch:30}, {wch:20}, {wch:15}, {wch:40}, {wch:40}];
+            
+            XLSX.utils.book_append_sheet(wb, ws, "Feedback Data");
+
+            if (lastFetchedComplaints && lastFetchedComplaints.length > 0) {
+                const compData = lastFetchedComplaints.map(c => ({
+                    'Date Filed': new Date(c.created_at).toLocaleString(),
+                    'Complainant': c.name || 'Anonymous',
+                    'Location of Incident': c.place_of_incident || 'N/A',
+                    'Detailed Narrative': c.narrative_report || 'N/A',
+                    'Desired Resolution': c.desired_outcome || 'N/A'
+                }));
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(compData), "Formal Complaints");
+            }
+
+            const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
+            const dataUri = 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + wbout;
+            const dateStr = new Date().toISOString().split('T')[0];
+            
+            Swal.close();
+            setTimeout(() => {
+                triggerDownload(dataUri, `BISU_Feedback_Data_${dateStr}.xlsx`);
+                showToast('Excel Data Exported.', 'success');
+            }, 300);
+        } catch (err) {
+            console.error(err);
+            Swal.close();
+            showToast('Export failed.', 'error');
+        }
+    }
+
+    // Export helper
+    function getDesc(score) {
+        if(score >= 4.5) return 'Outstanding';
+        if(score >= 3.5) return 'Very Satisfactory';
+        if(score >= 2.5) return 'Satisfactory';
+        if(score >= 1.5) return 'Fair';
+        return 'Poor';
+    }
+
+    if (exportPdfBtn) exportPdfBtn.addEventListener('click', exportToPDF);
+    if (exportExcelBtn) exportExcelBtn.addEventListener('click', exportToExcel);
+
+    async function resetSystemData() {
+        const { value: confirmReset } = await Swal.fire({
+            title: 'Are you absolutely sure?',
+            html: `This will <strong>PERMANENTLY DELETE</strong> all feedbacks and complaints from the database. <br><br>Please type <strong>RESET</strong> to confirm:`,
+            input: 'text',
+            inputAttributes: { autocapitalize: 'off' },
+            showCancelButton: true,
+            confirmButtonText: 'Confirm Wipe',
+            confirmButtonColor: '#d33',
+            cancelButtonText: 'Keep Data',
+            customClass: {
+                popup: 'rounded-3xl shadow-2xl border-t-8 border-red-500',
+                title: 'text-2xl font-black text-slate-800',
+                input: 'rounded-xl border-slate-200'
+            },
+            preConfirm: (value) => {
+                if (value !== 'RESET') {
+                    Swal.showValidationMessage('You must type RESET exactly to proceed');
+                }
+                return value === 'RESET';
+            }
+        });
+
+        if (confirmReset) {
+            Swal.fire({
+                title: 'Wiping Data...',
+                html: 'Deleting all records from Supabase cloud...',
+                allowOutsideClick: false,
+                didOpen: () => Swal.showLoading(),
+                customClass: { popup: 'rounded-3xl' }
+            });
+
+            try {
+                // Delete from both tables
+                const { error: fErr } = await client.from('feedbacks').delete().neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all rows
+                const { error: cErr } = await client.from('complaints').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+
+                if (fErr || cErr) throw new Error('Failed to delete some records.');
+
+                await fetchAdminData(); // Refresh the UI
+                
+                Swal.fire({
+                    title: 'System Reset Successful',
+                    text: 'All feedback and complaint records have been cleared.',
+                    icon: 'success',
+                    customClass: { popup: 'rounded-3xl' }
+                });
+            } catch (err) {
+                console.error(err);
+                Swal.fire('Error', 'An error occurred while resetting data.', 'error');
+            }
+        }
+    }
+
+    if (resetDataBtn) resetDataBtn.addEventListener('click', resetSystemData);
+
+    // Clear buttons
+    if (clearFeedbackBtn) {
+        clearFeedbackBtn.addEventListener('click', () => {
+            feedbackForm.reset();
+            // Reset stars
+            formConfig.dimensions[currentLang].forEach(d => {
+                document.getElementsByName(`rating-${d.id}`).forEach(radio => radio.checked = false);
+            });
+            showToast('Form cleared.', 'info');
+        });
+    }
+
+    if (clearComplaintBtn) {
+        clearComplaintBtn.addEventListener('click', () => {
+            complaintForm.reset();
+            showToast('Form cleared.', 'info');
         });
     }
 
